@@ -475,7 +475,25 @@
             background: #dc3545;
         }
 
-        /* Enhanced animations for notifications */
+        .debug-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            max-width: 300px;
+            font-size: 0.8rem;
+            z-index: 1500;
+            display: none;
+        }
+
+        .debug-panel.show {
+            display: block;
+        }
+
+        /* Animation for notifications */
         @keyframes slideDown {
             from {
                 transform: translateX(-50%) translateY(-100%);
@@ -496,52 +514,6 @@
                 transform: translateX(-50%) translateY(-100%);
                 opacity: 0;
             }
-        }
-
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideOutRight {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
-
-        /* Live indicator */
-        .live-indicator {
-            position: fixed;
-            top: 70px;
-            right: 20px;
-            background: #dc3545;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            z-index: 1500;
-            animation: pulse 2s infinite;
-        }
-
-        .live-indicator.connected {
-            background: #28a745;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
         }
 
         @media (max-width: 768px) {
@@ -568,8 +540,10 @@
         <i class="fas fa-cloud"></i> Menghubungkan ke Firebase...
     </div>
 
-    <div id="live-indicator" class="live-indicator hidden">
-        🔴 LIVE
+    <!-- Debug Panel -->
+    <div id="debug-panel" class="debug-panel">
+        <div id="debug-content"></div>
+        <button onclick="toggleDebug()" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; border: none; border-radius: 5px;">Hide</button>
     </div>
 
     <header class="header">
@@ -581,6 +555,9 @@
                 <a href="#contact">Kontak</a>
                 <button class="admin-btn" onclick="requestAdminPassword()">
                     <i class="fas fa-cog"></i> Admin
+                </button>
+                <button class="admin-btn" onclick="toggleDebug()" style="background: #6c757d; margin-left: 0.5rem;">
+                    <i class="fas fa-bug"></i>
                 </button>
             </div>
         </nav>
@@ -619,7 +596,7 @@
                     <i class="fas fa-plus"></i> Tambah Produk
                 </button>
                 <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
-                    📝 Total Produk: <span id="product-count">${products ? products.length : 0}</span>
+                    Total Produk: <span id="product-count">0</span>
                 </div>
             </div>
 
@@ -629,12 +606,15 @@
                     <i class="fas fa-plus"></i> Tambah Testimoni
                 </button>
                 <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
-                    ⭐ Total Testimoni: <span id="testimonial-count">${testimonials ? testimonials.length : 0}</span>
+                    Total Testimoni: <span id="testimonial-count">0</span>
                 </div>
             </div>
 
             <div class="admin-section">
-                <h3>Firebase & Backup</h3>
+                <h3>Data Management</h3>
+                <button class="btn" onclick="forceLocalSave()">
+                    <i class="fas fa-save"></i> Force Save Local
+                </button>
                 <button class="btn" onclick="syncToFirebase()">
                     <i class="fas fa-cloud-upload-alt"></i> Sync ke Firebase
                 </button>
@@ -647,13 +627,13 @@
                 <button class="btn" onclick="restoreData()">
                     <i class="fas fa-upload"></i> Restore Data
                 </button>
-                <button class="btn btn-danger" onclick="showStorageFullDialog()">
-                    <i class="fas fa-broom"></i> Manage Storage
+                <button class="btn" onclick="fixCorruptedData()" style="background: #ffc107; color: #000;">
+                    <i class="fas fa-wrench"></i> Fix Corrupted Data
+                </button>
+                <button class="btn btn-danger" onclick="clearAllData()">
+                    <i class="fas fa-trash"></i> Clear All Data
                 </button>
                 <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="handleRestore(event)">
-                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
-                    <div id="storage-info">📊 Checking storage...</div>
-                </div>
             </div>
         </div>
     </main>
@@ -708,13 +688,10 @@
                     <div class="file-input-wrapper">
                         <input type="file" id="product-image" class="file-input" accept="image/*" onchange="previewImage(this)">
                         <label for="product-image" class="file-input-label">
-                            <i class="fas fa-cloud-upload-alt"></i> Pilih Gambar (Maks 10MB - Auto Compress)
+                            <i class="fas fa-cloud-upload-alt"></i> Pilih Gambar dari Laptop
                         </label>
                     </div>
                     <img id="image-preview" class="image-preview hidden" alt="Preview">
-                    <small style="color: #666; font-size: 0.8rem; display: block; margin-top: 0.5rem;">
-                        💡 Tips: Gambar akan otomatis dikompres untuk menghemat storage
-                    </small>
                 </div>
                 <div class="form-group">
                     <label>Variasi:</label>
@@ -764,6 +741,56 @@
     </div>
 
     <script>
+        // Enhanced Debug System
+        let debugMode = false;
+        let debugLogs = [];
+
+        function debugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            debugLogs.push(logEntry);
+            
+            // Keep only last 50 logs
+            if (debugLogs.length > 50) {
+                debugLogs = debugLogs.slice(-50);
+            }
+            
+            console.log(logEntry);
+            updateDebugPanel();
+        }
+
+        function updateDebugPanel() {
+            if (!debugMode) return;
+            
+            const panel = document.getElementById('debug-panel');
+            const content = document.getElementById('debug-content');
+            
+            content.innerHTML = `
+                <strong>Debug Info:</strong><br>
+                Products: ${products.length}<br>
+                Testimonials: ${testimonials.length}<br>
+                Admin Login: ${isAdminLoggedIn}<br>
+                Firebase: ${firebaseInitialized ? 'Yes' : 'No'}<br>
+                UseFirestore: ${useFirestore}<br>
+                <hr style="margin: 0.5rem 0;">
+                <div style="max-height: 150px; overflow-y: auto; font-size: 0.7rem;">
+                    ${debugLogs.slice(-10).join('<br>')}
+                </div>
+            `;
+        }
+
+        function toggleDebug() {
+            debugMode = !debugMode;
+            const panel = document.getElementById('debug-panel');
+            
+            if (debugMode) {
+                panel.classList.add('show');
+                updateDebugPanel();
+            } else {
+                panel.classList.remove('show');
+            }
+        }
+
         // Firebase Configuration - Your Project Config
         const firebaseConfig = {
             apiKey: "AIzaSyDt_5C0QZlg97Zq6OQOveGB1FXZR0lpk-w",
@@ -784,53 +811,54 @@
         try {
             firebase.initializeApp(firebaseConfig);
             firebaseInitialized = true;
+            debugLog('Firebase app initialized successfully');
             
             // Try Firestore first (more common nowadays)
             try {
                 firestore = firebase.firestore();
                 useFirestore = true;
                 updateFirebaseStatus('✅ Firestore Connected', false);
-                console.log('✅ Using Firestore Database');
+                debugLog('Using Firestore Database');
                 
                 // Test Firestore connection
-                firestore.collection('test').doc('connection').set({test: true})
+                firestore.collection('test').doc('connection').set({test: true, timestamp: Date.now()})
                     .then(() => {
-                        console.log('✅ Firestore write test successful');
+                        debugLog('Firestore write test successful');
                         updateFirebaseStatus('✅ Firestore Ready', false);
                     })
                     .catch((error) => {
-                        console.error('❌ Firestore write test failed:', error);
+                        debugLog('Firestore write test failed: ' + error.message, 'error');
                         updateFirebaseStatus('❌ Firestore Write Error: ' + error.message, true);
                     });
                     
             } catch (firestoreError) {
-                console.log('⚠️ Firestore not available, trying Realtime Database...');
+                debugLog('Firestore not available, trying Realtime Database...', 'warn');
                 
                 // Fallback to Realtime Database
                 try {
                     db = firebase.database();
                     useFirestore = false;
                     updateFirebaseStatus('✅ Realtime Database Connected', false);
-                    console.log('✅ Using Realtime Database');
+                    debugLog('Using Realtime Database');
                     
                     // Test Realtime Database connection
-                    db.ref('test/connection').set({test: true})
+                    db.ref('test/connection').set({test: true, timestamp: Date.now()})
                         .then(() => {
-                            console.log('✅ Realtime Database write test successful');
+                            debugLog('Realtime Database write test successful');
                             updateFirebaseStatus('✅ Realtime DB Ready', false);
                         })
                         .catch((error) => {
-                            console.error('❌ Realtime Database write test failed:', error);
+                            debugLog('Realtime Database write test failed: ' + error.message, 'error');
                             updateFirebaseStatus('❌ Realtime DB Write Error: ' + error.message, true);
                         });
                         
                 } catch (realtimeError) {
-                    console.error('❌ Both Firestore and Realtime Database failed:', realtimeError);
+                    debugLog('Both Firestore and Realtime Database failed: ' + realtimeError.message, 'error');
                     updateFirebaseStatus('❌ All Firebase services failed', true);
                 }
             }
         } catch (error) {
-            console.error('❌ Firebase initialization error:', error);
+            debugLog('Firebase initialization error: ' + error.message, 'error');
             updateFirebaseStatus('❌ Firebase Init Error: ' + error.message, true);
         }
 
@@ -846,246 +874,204 @@
 
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            loadData();
+            debugLog('DOM Content Loaded - Initializing app');
+            
+            // Load data with proper error handling
+            try {
+                loadData();
+                debugLog('Local data loaded');
+            } catch (error) {
+                debugLog('Error loading local data: ' + error.message, 'error');
+                initializeSampleData();
+            }
+            
+            // Render initial state
             renderProducts();
             renderTestimonials();
+            updateCounts();
+            
+            // Setup auto backup
             setupAutoBackup();
-            loadFromFirebase();
-            setupRealTimeListeners(); // Add real-time listeners
-            checkStorageUsage(); // Check storage status
+            
+            // Load from Firebase after local load
+            setTimeout(() => {
+                loadFromFirebase();
+            }, 1000);
+            
+            debugLog('App initialization complete');
         });
 
-        // Check storage usage
-        function checkStorageUsage() {
-            try {
-                const data = localStorage.getItem('choco_dubai_data') || '{}';
-                const sizeKB = Math.round(data.length / 1024);
-                const sizeMB = (sizeKB / 1024).toFixed(2);
-                
-                let status = '';
-                if (sizeMB < 1) {
-                    status = `📊 Storage: ${sizeKB}KB (Aman)`;
-                } else if (sizeMB < 5) {
-                    status = `📊 Storage: ${sizeMB}MB (Normal)`;
-                } else if (sizeMB < 8) {
-                    status = `⚠️ Storage: ${sizeMB}MB (Tinggi)`;
-                } else {
-                    status = `🚨 Storage: ${sizeMB}MB (Penuh!)`;
-                }
-                
-                const storageInfo = document.getElementById('storage-info');
-                if (storageInfo) {
-                    storageInfo.textContent = status;
-                }
-                
-                console.log('📊 Storage usage:', status);
-            } catch (e) {
-                console.error('Error checking storage:', e);
+        function updateCounts() {
+            const productCount = document.getElementById('product-count');
+            const testimonialCount = document.getElementById('testimonial-count');
+            
+            if (productCount) productCount.textContent = products.length;
+            if (testimonialCount) testimonialCount.textContent = testimonials.length;
+            
+            debugLog(`Updated counts - Products: ${products.length}, Testimonials: ${testimonials.length}`);
+        }
+
+        // Enhanced Firebase Functions with detailed logging
+        function syncToFirebase() {
+            debugLog('Starting sync to Firebase...');
+            
+            if (!firestore && !db) {
+                debugLog('No Firebase service available', 'error');
+                updateFirebaseStatus('❌ Firebase tidak tersedia', true);
+                return Promise.reject('No Firebase service available');
+            }
+
+            const data = {
+                products: products,
+                testimonials: testimonials,
+                timestamp: new Date().toISOString(),
+                lastUpdated: Date.now()
+            };
+
+            debugLog(`Syncing data - Products: ${products.length}, Testimonials: ${testimonials.length}`);
+
+            if (useFirestore && firestore) {
+                debugLog('Syncing to Firestore...');
+                return firestore.collection('choco-dubai').doc('data').set(data)
+                    .then(() => {
+                        debugLog('Firestore sync successful');
+                        updateFirebaseStatus('✅ Data synced ke Firestore', false);
+                        return true;
+                    })
+                    .catch((error) => {
+                        debugLog('Firestore sync error: ' + error.message, 'error');
+                        updateFirebaseStatus('❌ Firestore Error: ' + error.message, true);
+                        return false;
+                    });
+            } else if (db) {
+                debugLog('Syncing to Realtime Database...');
+                return db.ref('choco-dubai').set(data)
+                    .then(() => {
+                        debugLog('Realtime Database sync successful');
+                        updateFirebaseStatus('✅ Data synced ke Realtime DB', false);
+                        return true;
+                    })
+                    .catch((error) => {
+                        debugLog('Realtime Database sync error: ' + error.message, 'error');
+                        updateFirebaseStatus('❌ Realtime DB Error: ' + error.message, true);
+                        return false;
+                    });
             }
         }
 
-        // Enhanced real-time listeners with instant updates
-        function setupRealTimeListeners() {
-            console.log('🔴 Setting up real-time listeners...');
+        function loadFromFirebase() {
+            debugLog('Loading from Firebase...');
             
+            if (!firestore && !db) {
+                debugLog('No Firebase service available for loading', 'warn');
+                return;
+            }
+
             if (useFirestore && firestore) {
-                // Firestore real-time listener with instant updates
-                const unsubscribe = firestore.collection('choco-dubai').doc('data')
-                    .onSnapshot((doc) => {
+                debugLog('Loading from Firestore...');
+                firestore.collection('choco-dubai').doc('data').get()
+                    .then((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            const isFromServer = doc.metadata.fromCache === false;
-                            
-                            console.log('🔴 Firestore update received:', {
-                                fromServer: isFromServer,
-                                timestamp: data.timestamp,
-                                products: data.products?.length || 0,
-                                testimonials: data.testimonials?.length || 0
-                            });
+                            debugLog('Firestore data received');
                             
                             if (data && data.products && data.testimonials) {
-                                // Only update if not admin to avoid conflicts during editing
-                                if (!isAdminLoggedIn || isFromServer) {
-                                    const hasProductChanges = JSON.stringify(products) !== JSON.stringify(data.products);
-                                    const hasTestimonialChanges = JSON.stringify(testimonials) !== JSON.stringify(data.testimonials);
-                                    
-                                    if (hasProductChanges || hasTestimonialChanges) {
-                                        console.log('🔄 Data changed, updating UI...', {
-                                            productsChanged: hasProductChanges,
-                                            testimonialsChanged: hasTestimonialChanges
-                                        });
-                                        
-                                        const oldProductCount = products.length;
-                                        const oldTestimonialCount = testimonials.length;
-                                        
-                                        products = data.products;
-                                        testimonials = data.testimonials;
-                                        
-                                        renderProducts();
-                                        renderTestimonials();
-                                        saveData();
-                                        
-                                        // Show notification for new items
-                                        if (data.products.length > oldProductCount) {
-                                            showUpdateNotification('🆕 Produk baru ditambahkan!', 'success');
-                                        } else if (data.products.length < oldProductCount) {
-                                            showUpdateNotification('🗑️ Produk dihapus', 'info');
-                                        } else if (hasProductChanges) {
-                                            showUpdateNotification('✏️ Produk diperbarui', 'info');
-                                        }
-                                        
-                                        if (data.testimonials.length > oldTestimonialCount) {
-                                            showUpdateNotification('⭐ Testimoni baru!', 'success');
-                                        }
-                                    }
-                                }
+                                const oldProductCount = products.length;
+                                const oldTestimonialCount = testimonials.length;
+                                
+                                products = data.products;
+                                testimonials = data.testimonials;
+                                
+                                debugLog(`Data updated - Products: ${oldProductCount} -> ${products.length}, Testimonials: ${oldTestimonialCount} -> ${testimonials.length}`);
+                                
+                                renderProducts();
+                                renderTestimonials();
+                                updateCounts();
+                                saveData(); // Save to local storage as backup
+                                updateFirebaseStatus('✅ Data loaded dari Firestore', false);
+                            } else {
+                                debugLog('Invalid data structure in Firestore', 'warn');
                             }
+                        } else {
+                            debugLog('No data found in Firestore, using local data', 'warn');
+                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
                         }
-                    }, (error) => {
-                        console.error('❌ Firestore listener error:', error);
-                        updateFirebaseStatus('❌ Real-time connection lost', true);
-                        
-                        // Retry connection after 5 seconds
-                        setTimeout(() => {
-                            console.log('🔄 Retrying Firestore connection...');
-                            setupRealTimeListeners();
-                        }, 5000);
+                    })
+                    .catch((error) => {
+                        debugLog('Firestore load error: ' + error.message, 'error');
+                        updateFirebaseStatus('❌ Gagal load dari Firestore: ' + error.message, true);
                     });
-                    
-                // Store unsubscribe function for cleanup
-                window.firestoreUnsubscribe = unsubscribe;
-                
             } else if (db) {
-                // Realtime Database listener with instant updates
-                db.ref('choco-dubai').on('value', (snapshot) => {
-                    const data = snapshot.val();
-                    console.log('🔴 Realtime DB update received:', data ? Object.keys(data) : 'null');
-                    
-                    if (data && data.products && data.testimonials && !isAdminLoggedIn) {
-                        const hasProductChanges = JSON.stringify(products) !== JSON.stringify(data.products);
-                        const hasTestimonialChanges = JSON.stringify(testimonials) !== JSON.stringify(data.testimonials);
+                debugLog('Loading from Realtime Database...');
+                db.ref('choco-dubai').once('value')
+                    .then((snapshot) => {
+                        const data = snapshot.val();
+                        debugLog('Realtime Database data received');
                         
-                        if (hasProductChanges || hasTestimonialChanges) {
-                            console.log('🔄 Realtime DB data changed, updating UI...');
-                            
+                        if (data && data.products && data.testimonials) {
                             const oldProductCount = products.length;
                             const oldTestimonialCount = testimonials.length;
                             
                             products = data.products;
                             testimonials = data.testimonials;
                             
+                            debugLog(`Data updated - Products: ${oldProductCount} -> ${products.length}, Testimonials: ${oldTestimonialCount} -> ${testimonials.length}`);
+                            
                             renderProducts();
                             renderTestimonials();
-                            saveData();
-                            
-                            // Show notifications
-                            if (data.products.length > oldProductCount) {
-                                showUpdateNotification('🆕 Produk baru ditambahkan!', 'success');
-                            } else if (data.testimonials.length > oldTestimonialCount) {
-                                showUpdateNotification('⭐ Testimoni baru!', 'success');
-                            } else {
-                                showUpdateNotification('🔄 Data diperbarui', 'info');
-                            }
+                            updateCounts();
+                            saveData(); // Save to local storage as backup
+                            updateFirebaseStatus('✅ Data loaded dari Realtime DB', false);
+                        } else {
+                            debugLog('No data found in Realtime Database, using local data', 'warn');
+                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
                         }
-                    }
-                }, (error) => {
-                    console.error('❌ Realtime Database listener error:', error);
-                    updateFirebaseStatus('❌ Real-time connection lost', true);
-                });
-            }
-            
-            // Set up connection monitoring
-            if (useFirestore && firestore) {
-                // Monitor Firestore connection
-                firestore.enableNetwork().then(() => {
-                    console.log('🌐 Firestore network enabled');
-                    updateFirebaseStatus('🔴 Live - Real-time active', false);
-                });
-            } else if (db) {
-                // Monitor Realtime Database connection
-                db.ref('.info/connected').on('value', (snapshot) => {
-                    if (snapshot.val() === true) {
-                        console.log('🌐 Realtime Database connected');
-                        updateFirebaseStatus('🔴 Live - Real-time active', false);
-                    } else {
-                        console.log('❌ Realtime Database disconnected');
-                        updateFirebaseStatus('❌ Disconnected', true);
-                    }
-                });
+                    })
+                    .catch((error) => {
+                        debugLog('Realtime Database load error: ' + error.message, 'error');
+                        updateFirebaseStatus('❌ Gagal load dari Realtime DB: ' + error.message, true);
+                    });
             }
         }
 
-        // Enhanced notification system
-        function showUpdateNotification(message, type = 'success') {
-            const notification = document.createElement('div');
+        // Auto backup every 30 seconds and on page unload
+        function setupAutoBackup() {
+            debugLog('Setting up auto backup system');
             
-            const colors = {
-                success: { bg: '#28a745', border: '#1e7e34' },
-                info: { bg: '#17a2b8', border: '#117a8b' },
-                warning: { bg: '#ffc107', border: '#d39e00' }
-            };
+            setInterval(() => {
+                debugLog('Auto backup triggered');
+                saveData();
+                if (isAdminLoggedIn && (products.length > 0 || testimonials.length > 0)) {
+                    syncToFirebase();
+                }
+            }, 30000);
             
-            const color = colors[type] || colors.success;
+            window.addEventListener('beforeunload', function() {
+                debugLog('Page unload - saving data');
+                saveData();
+                if (isAdminLoggedIn) {
+                    syncToFirebase();
+                }
+            });
             
-            notification.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                background: ${color.bg};
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 25px;
-                border-left: 4px solid ${color.border};
-                z-index: 3000;
-                font-weight: bold;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                animation: slideInRight 0.5s ease;
-                max-width: 300px;
-                font-size: 0.9rem;
-            `;
-            notification.innerHTML = message;
-            
-            document.body.appendChild(notification);
-            
-            // Auto remove after 4 seconds
-            setTimeout(() => {
-                notification.style.animation = 'slideOutRight 0.5s ease';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        document.body.removeChild(notification);
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    debugLog('Page hidden - saving data');
+                    saveData();
+                    if (isAdminLoggedIn) {
+                        syncToFirebase();
                     }
-                }, 500);
-            }, 4000);
-            
-            // Click to dismiss
-            notification.addEventListener('click', () => {
-                notification.style.animation = 'slideOutRight 0.5s ease';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        document.body.removeChild(notification);
-                    }
-                }, 500);
+                }
             });
         }
 
         function updateFirebaseStatus(message, isError) {
             const status = document.getElementById('firebase-status');
-            const liveIndicator = document.getElementById('live-indicator');
-            
             status.textContent = message;
             status.className = isError ? 'firebase-status error' : 'firebase-status';
             status.classList.remove('hidden');
             
-            // Update live indicator
-            if (message.includes('Live') || message.includes('Real-time active')) {
-                liveIndicator.textContent = '🔴 LIVE';
-                liveIndicator.className = 'live-indicator connected';
-                liveIndicator.classList.remove('hidden');
-            } else if (isError) {
-                liveIndicator.textContent = '❌ OFFLINE';
-                liveIndicator.className = 'live-indicator';
-                liveIndicator.classList.remove('hidden');
-            }
+            debugLog('Firebase status: ' + message, isError ? 'error' : 'info');
             
             setTimeout(() => {
                 status.classList.add('hidden');
@@ -1108,6 +1094,7 @@
             
             if (inputHash === adminPasswordHash) {
                 isAdminLoggedIn = true;
+                debugLog('Admin logged in successfully');
                 closeModal('password-modal');
                 toggleAdmin();
                 document.getElementById('admin-password').value = '';
@@ -1117,306 +1104,148 @@
                     el.classList.add('visible');
                 });
             } else {
+                debugLog('Invalid admin password attempt', 'warn');
                 alert('Password salah!');
                 document.getElementById('admin-password').value = '';
                 document.getElementById('admin-password').focus();
             }
         }
 
-        // Auto backup every 30 seconds and on page unload
-        function setupAutoBackup() {
-            setInterval(() => {
-                saveData();
-                if (isAdminLoggedIn) {
-                    syncToFirebase();
-                }
-            }, 30000);
-            
-            window.addEventListener('beforeunload', function() {
-                saveData();
-                if (isAdminLoggedIn) {
-                    syncToFirebase();
-                }
-            });
-            
-            document.addEventListener('visibilitychange', function() {
-                if (document.hidden) {
-                    saveData();
-                    if (isAdminLoggedIn) {
-                        syncToFirebase();
-                    }
-                }
-            });
-        }
-
-        // Enhanced Firebase Functions with detailed logging
-        function syncToFirebase() {
-            console.log('🔄 Starting sync to Firebase...');
-            console.log('Firebase initialized:', firebaseInitialized);
-            console.log('Use Firestore:', useFirestore);
-            console.log('Firestore object:', firestore);
-            console.log('Database object:', db);
-            
-            if (!firestore && !db) {
-                console.error('❌ No Firebase service available');
-                updateFirebaseStatus('❌ Firebase tidak tersedia', true);
-                return Promise.reject('No Firebase service available');
-            }
-
-            const data = {
-                products: products,
-                testimonials: testimonials,
-                timestamp: new Date().toISOString(),
-                lastUpdated: Date.now()
-            };
-
-            console.log('📤 Data to sync:', data);
-
-            if (useFirestore && firestore) {
-                // Use Firestore
-                console.log('📤 Syncing to Firestore...');
-                return firestore.collection('choco-dubai').doc('data').set(data)
-                    .then(() => {
-                        console.log('✅ Firestore sync successful');
-                        updateFirebaseStatus('✅ Data synced ke Firestore', false);
-                        return true;
-                    })
-                    .catch((error) => {
-                        console.error('❌ Firestore sync error:', error);
-                        console.error('Error code:', error.code);
-                        console.error('Error message:', error.message);
-                        updateFirebaseStatus('❌ Firestore Error: ' + error.message, true);
-                        return false;
-                    });
-            } else if (db) {
-                // Use Realtime Database
-                console.log('📤 Syncing to Realtime Database...');
-                return db.ref('choco-dubai').set(data)
-                    .then(() => {
-                        console.log('✅ Realtime Database sync successful');
-                        updateFirebaseStatus('✅ Data synced ke Realtime DB', false);
-                        return true;
-                    })
-                    .catch((error) => {
-                        console.error('❌ Realtime Database sync error:', error);
-                        console.error('Error code:', error.code);
-                        console.error('Error message:', error.message);
-                        updateFirebaseStatus('❌ Realtime DB Error: ' + error.message, true);
-                        return false;
-                    });
-            }
-        }
-
-        function loadFromFirebase() {
-            console.log('📥 Loading from Firebase...');
-            
-            if (!firestore && !db) {
-                console.log('⚠️ No Firebase service available for loading');
-                return;
-            }
-
-            if (useFirestore && firestore) {
-                // Load from Firestore
-                console.log('📥 Loading from Firestore...');
-                firestore.collection('choco-dubai').doc('data').get()
-                    .then((doc) => {
-                        if (doc.exists) {
-                            const data = doc.data();
-                            console.log('📥 Firestore data received:', data);
-                            
-                            if (data && data.products && data.testimonials) {
-                                products = data.products;
-                                testimonials = data.testimonials;
-                                renderProducts();
-                                renderTestimonials();
-                                saveData(); // Save to local storage as backup
-                                updateFirebaseStatus('✅ Data loaded dari Firestore', false);
-                                console.log('✅ Data loaded from Firestore successfully');
-                            } else {
-                                console.log('⚠️ Invalid data structure in Firestore');
-                            }
-                        } else {
-                            console.log('📭 No data found in Firestore, using local data');
-                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('❌ Firestore load error:', error);
-                        updateFirebaseStatus('❌ Gagal load dari Firestore: ' + error.message, true);
-                    });
-            } else if (db) {
-                // Load from Realtime Database
-                console.log('📥 Loading from Realtime Database...');
-                db.ref('choco-dubai').once('value')
-                    .then((snapshot) => {
-                        const data = snapshot.val();
-                        console.log('📥 Realtime Database data received:', data);
-                        
-                        if (data && data.products && data.testimonials) {
-                            products = data.products;
-                            testimonials = data.testimonials;
-                            renderProducts();
-                            renderTestimonials();
-                            saveData(); // Save to local storage as backup
-                            updateFirebaseStatus('✅ Data loaded dari Realtime DB', false);
-                            console.log('✅ Data loaded from Realtime Database successfully');
-                        } else {
-                            console.log('📭 No data found in Realtime Database, using local data');
-                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('❌ Realtime Database load error:', error);
-                        updateFirebaseStatus('❌ Gagal load dari Realtime DB: ' + error.message, true);
-                    });
-            }
-        }
-
-        // Enhanced image handling with compression
+        // Image handling functions
         function previewImage(input) {
             const preview = document.getElementById('image-preview');
             const label = input.nextElementSibling;
             
             if (input.files && input.files[0]) {
                 const file = input.files[0];
-                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                debugLog(`Image selected: ${file.name}, size: ${file.size} bytes`);
                 
-                console.log(`📷 Original image size: ${fileSizeMB}MB`);
-                
-                // Show loading state
-                label.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses gambar...';
-                label.style.borderColor = '#007bff';
-                label.style.background = '#e3f2fd';
+                // Check file size (limit to 2MB)
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('Ukuran file terlalu besar! Maksimal 2MB.');
+                    input.value = '';
+                    return;
+                }
                 
                 const reader = new FileReader();
+                
                 reader.onload = function(e) {
-                    // Compress image before preview
-                    compressImage(e.target.result, 0.7, 800, 600).then(compressedImage => {
-                        preview.src = compressedImage;
-                        preview.classList.remove('hidden');
-                        
-                        // Calculate compressed size
-                        const compressedSizeKB = Math.round((compressedImage.length * 0.75) / 1024);
-                        
-                        label.innerHTML = `<i class="fas fa-check"></i> Gambar siap (${compressedSizeKB}KB)`;
-                        label.style.borderColor = '#28a745';
-                        label.style.background = '#d4edda';
-                        
-                        console.log(`📷 Compressed image size: ~${compressedSizeKB}KB`);
-                    });
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    label.innerHTML = '<i class="fas fa-check"></i> Gambar dipilih';
+                    label.style.borderColor = '#28a745';
+                    label.style.background = '#d4edda';
+                    debugLog('Image preview loaded successfully');
+                };
+                
+                reader.onerror = function() {
+                    debugLog('Error reading image file', 'error');
+                    alert('Error membaca file gambar!');
                 };
                 
                 reader.readAsDataURL(file);
             }
         }
 
-        // Image compression function
-        function compressImage(base64, quality = 0.7, maxWidth = 800, maxHeight = 600) {
-            return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const img = new Image();
-                
-                img.onload = function() {
-                    // Calculate new dimensions
-                    let { width, height } = img;
+        // Enhanced image handling with better compression and validation
+        function getImageDataURL(fileInput) {
+            return new Promise((resolve, reject) => {
+                if (fileInput.files && fileInput.files[0]) {
+                    const file = fileInput.files[0];
                     
-                    if (width > maxWidth || height > maxHeight) {
-                        const ratio = Math.min(maxWidth / width, maxHeight / height);
-                        width *= ratio;
-                        height *= ratio;
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        reject('File harus berupa gambar!');
+                        return;
                     }
                     
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    // Draw and compress
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-                    
-                    resolve(compressedBase64);
-                };
-                
-                img.src = base64;
-            });
-        }
-
-        async function getImageDataURL(fileInput) {
-            return new Promise((resolve) => {
-                if (fileInput.files && fileInput.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = async function(e) {
-                        // Compress image before storing
-                        const compressedImage = await compressImage(e.target.result, 0.6, 600, 400);
-                        resolve(compressedImage);
+                    // Create image element for compression
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Calculate new dimensions (max 800px width/height)
+                        let { width, height } = img;
+                        const maxSize = 800;
+                        
+                        if (width > height) {
+                            if (width > maxSize) {
+                                height = (height * maxSize) / width;
+                                width = maxSize;
+                            }
+                        } else {
+                            if (height > maxSize) {
+                                width = (width * maxSize) / height;
+                                height = maxSize;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // Draw and compress
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Convert to data URL with compression
+                        const compressedDataURL = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        debugLog(`Image compressed: ${file.size} bytes -> ${compressedDataURL.length} chars`);
+                        resolve(compressedDataURL);
                     };
-                    reader.readAsDataURL(fileInput.files[0]);
+                    
+                    img.onerror = function() {
+                        reject('Error loading image file');
+                    };
+                    
+                    // Read file as data URL
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        img.src = e.target.result;
+                    };
+                    reader.onerror = function() {
+                        reject('Error reading image file');
+                    };
+                    reader.readAsDataURL(file);
                 } else {
                     resolve('');
                 }
             });
         }
 
-        // Enhanced data persistence with storage management
+        // Enhanced data persistence with better error handling
         function saveData() {
-            console.log('💾 Saving data locally...');
-            console.log('Products count:', products.length);
-            console.log('Testimonials count:', testimonials.length);
+            debugLog('Saving data locally...');
             
             const data = {
                 products: products,
                 testimonials: testimonials,
                 timestamp: new Date().toISOString(),
-                version: '2.0'
+                version: '3.0'
             };
             
             try {
                 const jsonData = JSON.stringify(data);
-                const dataSizeMB = (jsonData.length / (1024 * 1024)).toFixed(2);
-                console.log('💾 Data size:', dataSizeMB, 'MB');
+                debugLog(`Data size: ${jsonData.length} characters`);
                 
-                // Check if storage is getting full (>8MB)
-                if (jsonData.length > 8 * 1024 * 1024) {
-                    console.warn('⚠️ Data size is large, optimizing...');
-                    optimizeData();
-                    return saveData(); // Retry after optimization
+                // Check if localStorage is available
+                if (typeof(Storage) === "undefined") {
+                    throw new Error('LocalStorage not supported');
                 }
                 
-                // Try to save with error handling
-                try {
-                    localStorage.setItem('choco_dubai_data', jsonData);
-                    localStorage.setItem('choco_dubai_backup_1', jsonData);
-                    
-                    // Only keep 2 backups to save space
-                    console.log('✅ Local data saved successfully');
-                    return true;
-                } catch (storageError) {
-                    if (storageError.name === 'QuotaExceededError') {
-                        console.warn('⚠️ Storage quota exceeded, cleaning up...');
-                        cleanupStorage();
-                        
-                        // Retry with optimized data
-                        optimizeData();
-                        const optimizedData = JSON.stringify({
-                            products: products,
-                            testimonials: testimonials,
-                            timestamp: new Date().toISOString(),
-                            version: '2.0'
-                        });
-                        
-                        localStorage.setItem('choco_dubai_data', optimizedData);
-                        updateFirebaseStatus('⚠️ Storage penuh! Data dioptimasi', true);
-                        return true;
-                    } else {
-                        throw storageError;
-                    }
-                }
+                // Save to multiple slots for redundancy
+                localStorage.setItem('choco_dubai_data', jsonData);
+                localStorage.setItem('choco_dubai_backup_1', jsonData);
+                localStorage.setItem('choco_dubai_backup_2', jsonData);
+                
+                debugLog('Local data saved successfully');
+                return true;
                 
             } catch (e) {
-                console.error('❌ Error saving local data:', e);
+                debugLog('Error saving local data: ' + e.message, 'error');
+                
                 if (e.name === 'QuotaExceededError') {
-                    updateFirebaseStatus('❌ Storage penuh! Backup data dan clear browser', true);
-                    showStorageFullDialog();
+                    alert('Storage penuh! Mohon backup data dan clear browser storage.');
                 } else {
                     updateFirebaseStatus('❌ Local save error: ' + e.message, true);
                 }
@@ -1424,89 +1253,19 @@
             }
         }
 
-        // Optimize data by compressing images further
-        function optimizeData() {
-            console.log('🔧 Optimizing data...');
-            let optimized = 0;
-            
-            products.forEach(product => {
-                if (product.image && product.image.length > 50000) { // >50KB
-                    // Mark for re-compression (will be handled on next image update)
-                    console.log(`🔧 Large image found in product: ${product.name}`);
-                    optimized++;
-                }
-            });
-            
-            console.log(`🔧 Found ${optimized} items to optimize`);
-        }
-
-        // Clean up storage
-        function cleanupStorage() {
-            console.log('🧹 Cleaning up storage...');
-            
-            // Remove old backups
-            localStorage.removeItem('choco_dubai_backup_2');
-            
-            // Remove any old versions
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('choco_') && key !== 'choco_dubai_data' && key !== 'choco_dubai_backup_1') {
-                    localStorage.removeItem(key);
-                    console.log('🗑️ Removed old data:', key);
-                }
-            }
-        }
-
-        // Show storage full dialog
-        function showStorageFullDialog() {
-            const dialog = document.createElement('div');
-            dialog.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                z-index: 9999;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            `;
-            
-            dialog.innerHTML = `
-                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
-                    <h3 style="color: #dc3545; margin-bottom: 1rem;">⚠️ Storage Penuh!</h3>
-                    <p style="margin-bottom: 1rem;">Browser storage hampir penuh. Untuk melanjutkan:</p>
-                    <div style="text-align: left; margin: 1rem 0;">
-                        <p>1. <strong>Backup data</strong> terlebih dahulu</p>
-                        <p>2. <strong>Clear browser data</strong> untuk website ini</p>
-                        <p>3. Atau gunakan <strong>gambar yang lebih kecil</strong></p>
-                    </div>
-                    <button onclick="backupData()" style="background: #28a745; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
-                        📦 Backup Data
-                    </button>
-                    <button onclick="clearStorageData()" style="background: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
-                        🗑️ Clear Storage
-                    </button>
-                    <button onclick="this.parentElement.parentElement.remove()" style="background: #6c757d; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
-                        ❌ Tutup
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(dialog);
-        }
-
-        // Clear storage function
-        function clearStorageData() {
-            if (confirm('⚠️ Yakin ingin hapus semua data lokal? Pastikan sudah backup!')) {
-                localStorage.clear();
-                location.reload();
+        function forceLocalSave() {
+            debugLog('Force local save triggered');
+            const saved = saveData();
+            if (saved) {
+                alert('Data berhasil disimpan secara lokal!');
+                updateFirebaseStatus('✅ Force save berhasil!', false);
+            } else {
+                alert('Gagal menyimpan data lokal!');
             }
         }
 
         function loadData() {
-            console.log('📂 Loading data locally...');
+            debugLog('Loading data locally...');
             
             try {
                 let data = localStorage.getItem('choco_dubai_data') ||
@@ -1515,73 +1274,155 @@
                 
                 if (data) {
                     const parsedData = JSON.parse(data);
-                    console.log('📂 Local data found:', parsedData);
+                    debugLog('Local data found');
                     
-                    products = parsedData.products || [];
-                    testimonials = parsedData.testimonials || [];
+                    if (parsedData.products && Array.isArray(parsedData.products)) {
+                        products = parsedData.products;
+                    } else {
+                        debugLog('Invalid products data structure', 'warn');
+                        products = [];
+                    }
                     
-                    console.log('✅ Local data loaded - Products:', products.length, 'Testimonials:', testimonials.length);
+                    if (parsedData.testimonials && Array.isArray(parsedData.testimonials)) {
+                        testimonials = parsedData.testimonials;
+                    } else {
+                        debugLog('Invalid testimonials data structure', 'warn');
+                        testimonials = [];
+                    }
+                    
+                    debugLog(`Local data loaded - Products: ${products.length}, Testimonials: ${testimonials.length}`);
                 } else {
-                    console.log('📭 No local data found, initializing sample data');
+                    debugLog('No local data found, initializing sample data', 'warn');
                     initializeSampleData();
                 }
+                
             } catch (e) {
-                console.error('❌ Error loading local data:', e);
+                debugLog('Error loading local data: ' + e.message, 'error');
+                debugLog('Initializing sample data due to error', 'warn');
                 initializeSampleData();
             }
         }
 
         function initializeSampleData() {
-            products = [
-                {
-                    id: 1,
-                    name: "Dubai Chocolate Original",
-                    price: 75000,
-                    description: "Coklat Dubai premium dengan rasa original yang autentik. Dibuat dengan bahan berkualitas tinggi.",
-                    image: "",
-                    variations: [
-                        { name: "Small (100g)", price: 75000 },
-                        { name: "Medium (200g)", price: 140000 },
-                        { name: "Large (300g)", price: 200000 }
-                    ]
-                },
-                {
-                    id: 2,
-                    name: "Dubai Chocolate Pistachio",
-                    price: 85000,
-                    description: "Varian istimewa dengan campuran pistachio yang memberikan tekstur dan rasa yang unik.",
-                    image: "",
-                    variations: [
-                        { name: "Small (100g)", price: 85000 },
-                        { name: "Medium (200g)", price: 160000 }
-                    ]
-                }
-            ];
-
-            testimonials = [
-                {
-                    id: 1,
-                    name: "Sarah M.",
-                    rating: 5,
-                    text: "Coklat Dubai terenak yang pernah saya coba! Teksturnya lembut dan rasanya authentic banget. Pasti order lagi!"
-                },
-                {
-                    id: 2,
-                    name: "Ahmad R.",
-                    rating: 5,
-                    text: "Pelayanan cepat, packaging rapi, dan yang paling penting rasanya enak banget! Recommended!"
-                }
-            ];
+            debugLog('Initializing sample data');
             
+            // Start with empty arrays instead of hardcoded data
+            products = [];
+            testimonials = [];
+            
+            debugLog('Empty data initialized - ready for admin to add products');
             saveData();
+        }
+
+        function clearAllData() {
+            if (confirm('⚠️ PERINGATAN: Ini akan menghapus SEMUA data produk dan testimoni!\n\nApakah Anda yakin?')) {
+                debugLog('Clearing all data');
+                
+                products = [];
+                testimonials = [];
+                
+                // Clear localStorage completely
+                localStorage.removeItem('choco_dubai_data');
+                localStorage.removeItem('choco_dubai_backup_1');
+                localStorage.removeItem('choco_dubai_backup_2');
+                
+                // Clear Firebase too
+                if (useFirestore && firestore) {
+                    firestore.collection('choco-dubai').doc('data').delete()
+                        .then(() => {
+                            debugLog('Firebase data cleared');
+                        })
+                        .catch(error => {
+                            debugLog('Error clearing Firebase: ' + error.message, 'error');
+                        });
+                } else if (db) {
+                    db.ref('choco-dubai').remove()
+                        .then(() => {
+                            debugLog('Firebase data cleared');
+                        })
+                        .catch(error => {
+                            debugLog('Error clearing Firebase: ' + error.message, 'error');
+                        });
+                }
+                
+                // Re-render
+                renderProducts();
+                renderTestimonials();
+                updateCounts();
+                
+                alert('Semua data telah dihapus! Website siap untuk data baru.');
+                debugLog('All data cleared successfully');
+            }
+        }
+
+        // Add function to fix corrupted data
+        function fixCorruptedData() {
+            if (confirm('Ini akan memperbaiki data yang rusak. Lanjutkan?')) {
+                debugLog('Fixing corrupted data');
+                
+                // Filter out invalid products
+                products = products.filter(product => {
+                    const isValid = product && 
+                                  product.id && 
+                                  product.name && 
+                                  product.name.trim() !== '' && 
+                                  product.name !== '.' &&
+                                  product.price && 
+                                  product.price > 0 &&
+                                  product.description && 
+                                  product.description.trim() !== '';
+                    
+                    if (!isValid) {
+                        debugLog(`Removing invalid product: ${JSON.stringify(product)}`, 'warn');
+                    }
+                    return isValid;
+                });
+                
+                // Filter out invalid testimonials
+                testimonials = testimonials.filter(testimonial => {
+                    const isValid = testimonial && 
+                                  testimonial.id && 
+                                  testimonial.name && 
+                                  testimonial.name.trim() !== '' &&
+                                  testimonial.rating && 
+                                  testimonial.rating >= 1 && 
+                                  testimonial.rating <= 5 &&
+                                  testimonial.text && 
+                                  testimonial.text.trim() !== '';
+                    
+                    if (!isValid) {
+                        debugLog(`Removing invalid testimonial: ${JSON.stringify(testimonial)}`, 'warn');
+                    }
+                    return isValid;
+                });
+                
+                // Fix products without proper variations
+                products.forEach(product => {
+                    if (!product.variations || !Array.isArray(product.variations)) {
+                        product.variations = [];
+                    }
+                });
+                
+                saveData();
+                syncToFirebase();
+                renderProducts();
+                renderTestimonials();
+                updateCounts();
+                
+                alert(`Data diperbaiki! Products: ${products.length}, Testimonials: ${testimonials.length}`);
+                debugLog('Data corruption fix completed');
+            }
         }
 
         // Manual backup and restore
         function backupData() {
+            debugLog('Creating manual backup');
+            
             const data = {
                 products: products,
                 testimonials: testimonials,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                version: '3.0'
             };
             
             const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -1592,6 +1433,7 @@
             a.click();
             URL.revokeObjectURL(url);
             
+            debugLog('Manual backup downloaded');
             alert('Data berhasil di-backup!');
         }
 
@@ -1602,22 +1444,33 @@
         function handleRestore(event) {
             const file = event.target.files[0];
             if (file) {
+                debugLog(`Restoring data from file: ${file.name}`);
+                
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     try {
                         const data = JSON.parse(e.target.result);
-                        if (data.products && data.testimonials) {
+                        
+                        if (data.products && Array.isArray(data.products) && 
+                            data.testimonials && Array.isArray(data.testimonials)) {
+                            
                             products = data.products;
                             testimonials = data.testimonials;
+                            
                             saveData();
                             syncToFirebase();
                             renderProducts();
                             renderTestimonials();
+                            updateCounts();
+                            
+                            debugLog(`Data restored - Products: ${products.length}, Testimonials: ${testimonials.length}`);
                             alert('Data berhasil di-restore!');
+                            
                         } else {
-                            alert('Format file tidak valid!');
+                            throw new Error('Invalid file format');
                         }
                     } catch (error) {
+                        debugLog('Error restoring data: ' + error.message, 'error');
                         alert('Error membaca file: ' + error.message);
                     }
                 };
@@ -1629,6 +1482,10 @@
         function toggleAdmin() {
             const panel = document.getElementById('admin-panel');
             panel.classList.toggle('hidden');
+            
+            if (!panel.classList.contains('hidden')) {
+                updateCounts();
+            }
         }
 
         function openModal(modalId) {
@@ -1724,79 +1581,22 @@
         }
 
         function deleteProduct(id) {
-            // Enhanced delete confirmation
-            const product = products.find(p => p.id === id);
-            if (!product) return;
-            
-            const confirmDialog = document.createElement('div');
-            confirmDialog.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                z-index: 9999;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            `;
-            
-            confirmDialog.innerHTML = `
-                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
-                    <h3 style="color: #dc3545; margin-bottom: 1rem;">🗑️ Hapus Produk</h3>
-                    <p style="margin-bottom: 1rem;">Yakin ingin menghapus produk:</p>
-                    <p style="font-weight: bold; color: #333; margin-bottom: 1.5rem;">"${product.name}"</p>
-                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem;">
-                        ⚠️ Tindakan ini tidak dapat dibatalkan dan akan menghapus produk dari semua customer!
-                    </p>
-                    <button onclick="confirmDeleteProduct(${id}); document.body.removeChild(this.parentElement.parentElement)" 
-                            style="background: #dc3545; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer; font-weight: bold;">
-                        🗑️ Ya, Hapus
-                    </button>
-                    <button onclick="document.body.removeChild(this.parentElement.parentElement)" 
-                            style="background: #6c757d; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer;">
-                        ❌ Batal
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(confirmDialog);
-        }
-        
-        function confirmDeleteProduct(id) {
-            console.log('🗑️ Deleting product with ID:', id);
-            
-            const productIndex = products.findIndex(p => p.id === id);
-            if (productIndex === -1) {
-                console.error('❌ Product not found');
-                return;
-            }
-            
-            const deletedProduct = products[productIndex];
-            console.log('🗑️ Deleting product:', deletedProduct.name);
-            
-            // Remove from array
-            products.splice(productIndex, 1);
-            
-            // Save and sync
-            saveData();
-            renderProducts();
-            
-            // Sync to Firebase with success callback
-            syncToFirebase().then((success) => {
-                if (success) {
-                    showUpdateNotification(`🗑️ "${deletedProduct.name}" berhasil dihapus`, 'info');
-                    updateFirebaseStatus('✅ Produk dihapus dan disync', false);
+            if (confirm('Yakin ingin menghapus produk ini?')) {
+                debugLog(`Deleting product with ID: ${id}`);
+                
+                const productIndex = products.findIndex(p => p.id === id);
+                if (productIndex !== -1) {
+                    products.splice(productIndex, 1);
+                    saveData();
+                    renderProducts();
+                    updateCounts();
+                    syncToFirebase();
+                    
+                    debugLog('Product deleted successfully');
                 } else {
-                    showUpdateNotification(`⚠️ "${deletedProduct.name}" dihapus lokal, sync gagal`, 'warning');
+                    debugLog('Product not found for deletion', 'error');
                 }
-            }).catch((error) => {
-                console.error('❌ Delete sync error:', error);
-                showUpdateNotification(`⚠️ "${deletedProduct.name}" dihapus lokal saja`, 'warning');
-            });
-            
-            console.log(`✅ Product deleted. Remaining products: ${products.length}`);
+            }
         }
 
         // Testimonial Management
@@ -1817,122 +1617,73 @@
         }
 
         function deleteTestimonial(id) {
-            // Enhanced delete confirmation for testimonials
-            const testimonial = testimonials.find(t => t.id === id);
-            if (!testimonial) return;
-            
-            const confirmDialog = document.createElement('div');
-            confirmDialog.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                z-index: 9999;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            `;
-            
-            confirmDialog.innerHTML = `
-                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
-                    <h3 style="color: #dc3545; margin-bottom: 1rem;">🗑️ Hapus Testimoni</h3>
-                    <p style="margin-bottom: 1rem;">Yakin ingin menghapus testimoni dari:</p>
-                    <p style="font-weight: bold; color: #333; margin-bottom: 0.5rem;">"${testimonial.name}"</p>
-                    <p style="color: #f39c12; margin-bottom: 1rem;">${'⭐'.repeat(testimonial.rating)}</p>
-                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem; font-style: italic;">
-                        "${testimonial.text.substring(0, 50)}..."
-                    </p>
-                    <button onclick="confirmDeleteTestimonial(${id}); document.body.removeChild(this.parentElement.parentElement)" 
-                            style="background: #dc3545; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer; font-weight: bold;">
-                        🗑️ Ya, Hapus
-                    </button>
-                    <button onclick="document.body.removeChild(this.parentElement.parentElement)" 
-                            style="background: #6c757d; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer;">
-                        ❌ Batal
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(confirmDialog);
-        }
-        
-        function confirmDeleteTestimonial(id) {
-            console.log('🗑️ Deleting testimonial with ID:', id);
-            
-            const testimonialIndex = testimonials.findIndex(t => t.id === id);
-            if (testimonialIndex === -1) {
-                console.error('❌ Testimonial not found');
-                return;
-            }
-            
-            const deletedTestimonial = testimonials[testimonialIndex];
-            console.log('🗑️ Deleting testimonial from:', deletedTestimonial.name);
-            
-            // Remove from array
-            testimonials.splice(testimonialIndex, 1);
-            
-            // Save and sync
-            saveData();
-            renderTestimonials();
-            
-            // Sync to Firebase with success callback
-            syncToFirebase().then((success) => {
-                if (success) {
-                    showUpdateNotification(`🗑️ Testimoni dari "${deletedTestimonial.name}" dihapus`, 'info');
-                    updateFirebaseStatus('✅ Testimoni dihapus dan disync', false);
+            if (confirm('Yakin ingin menghapus testimoni ini?')) {
+                debugLog(`Deleting testimonial with ID: ${id}`);
+                
+                const testimonialIndex = testimonials.findIndex(t => t.id === id);
+                if (testimonialIndex !== -1) {
+                    testimonials.splice(testimonialIndex, 1);
+                    saveData();
+                    renderTestimonials();
+                    updateCounts();
+                    syncToFirebase();
+                    
+                    debugLog('Testimonial deleted successfully');
                 } else {
-                    showUpdateNotification(`⚠️ Testimoni dihapus lokal, sync gagal`, 'warning');
+                    debugLog('Testimonial not found for deletion', 'error');
                 }
-            }).catch((error) => {
-                console.error('❌ Delete sync error:', error);
-                showUpdateNotification(`⚠️ Testimoni dihapus lokal saja`, 'warning');
-            });
-            
-            console.log(`✅ Testimonial deleted. Remaining testimonials: ${testimonials.length}`);
+            }
         }
 
         // Form Handlers with better error handling
         document.getElementById('product-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-            console.log('📝 Product form submitted...');
+            debugLog('Product form submitted...');
             
             try {
-                const name = document.getElementById('product-name').value;
+                const name = document.getElementById('product-name').value.trim();
                 const price = parseInt(document.getElementById('product-price').value);
-                const description = document.getElementById('product-description').value;
+                const description = document.getElementById('product-description').value.trim();
                 const imageInput = document.getElementById('product-image');
                 
-                console.log('📝 Product data:', { name, price, description });
+                // Validation
+                if (!name || !price || !description) {
+                    throw new Error('Semua field harus diisi!');
+                }
+                
+                if (price <= 0) {
+                    throw new Error('Harga harus lebih dari 0!');
+                }
+                
+                debugLog(`Product data: ${name}, ${price}, ${description.substring(0, 50)}...`);
                 
                 // Get image as base64 data URL
                 let imageData = '';
                 if (imageInput.files && imageInput.files[0]) {
-                    console.log('🖼️ Processing image...');
+                    debugLog('Processing image...');
                     imageData = await getImageDataURL(imageInput);
-                    console.log('🖼️ Image processed, size:', imageData.length);
+                    debugLog(`Image processed, size: ${imageData.length} characters`);
                 } else if (currentEditingProduct && currentEditingProduct.image) {
                     imageData = currentEditingProduct.image; // Keep existing image
-                    console.log('🖼️ Keeping existing image');
+                    debugLog('Keeping existing image');
                 }
                 
                 // Collect variations
                 const variationInputs = document.querySelectorAll('.variation-input');
                 const variations = [];
                 variationInputs.forEach(input => {
-                    const name = input.querySelector('.variation-name').value;
-                    const price = parseInt(input.querySelector('.variation-price').value);
-                    if (name && price) {
-                        variations.push({ name, price });
+                    const varName = input.querySelector('.variation-name').value.trim();
+                    const varPrice = parseInt(input.querySelector('.variation-price').value);
+                    if (varName && varPrice && varPrice > 0) {
+                        variations.push({ name: varName, price: varPrice });
                     }
                 });
                 
-                console.log('📝 Variations:', variations);
+                debugLog(`Variations: ${variations.length} items`);
                 
                 if (currentEditingProduct) {
                     // Update existing product
-                    console.log('✏️ Updating existing product...');
+                    debugLog(`Updating existing product ID: ${currentEditingProduct.id}`);
                     currentEditingProduct.name = name;
                     currentEditingProduct.price = price;
                     currentEditingProduct.description = description;
@@ -1940,9 +1691,9 @@
                     currentEditingProduct.variations = variations;
                 } else {
                     // Add new product
-                    console.log('➕ Adding new product...');
+                    debugLog('Adding new product...');
                     const newProduct = {
-                        id: Date.now(),
+                        id: Date.now(), // Use timestamp as unique ID
                         name,
                         price,
                         description,
@@ -1950,10 +1701,11 @@
                         variations
                     };
                     products.push(newProduct);
-                    console.log('➕ Product added, total products:', products.length);
+                    debugLog(`Product added with ID: ${newProduct.id}, total products: ${products.length}`);
                 }
                 
                 // Save locally first
+                debugLog('Saving data locally...');
                 const localSaved = saveData();
                 if (!localSaved) {
                     throw new Error('Failed to save data locally');
@@ -1961,27 +1713,29 @@
                 
                 // Render immediately
                 renderProducts();
+                updateCounts();
                 
                 // Sync to Firebase
-                console.log('🔄 Attempting Firebase sync...');
+                debugLog('Attempting Firebase sync...');
                 try {
                     const syncResult = await syncToFirebase();
                     if (syncResult) {
-                        console.log('✅ Product saved successfully (local + Firebase)');
+                        debugLog('Product saved successfully (local + Firebase)');
                         updateFirebaseStatus('✅ Produk tersimpan!', false);
                     } else {
-                        console.log('⚠️ Product saved locally, Firebase sync failed');
+                        debugLog('Product saved locally, Firebase sync failed', 'warn');
                         updateFirebaseStatus('⚠️ Tersimpan lokal, Firebase gagal', true);
                     }
                 } catch (syncError) {
-                    console.error('❌ Firebase sync error:', syncError);
+                    debugLog('Firebase sync error: ' + syncError.message, 'error');
                     updateFirebaseStatus('⚠️ Tersimpan lokal saja', true);
                 }
                 
                 closeModal('product-modal');
+                debugLog('Product save process completed');
                 
             } catch (error) {
-                console.error('❌ Error saving product:', error);
+                debugLog('Error saving product: ' + error.message, 'error');
                 updateFirebaseStatus('❌ Error: ' + error.message, true);
                 alert('Error menyimpan produk: ' + error.message);
             }
@@ -1989,42 +1743,73 @@
 
         document.getElementById('testimonial-form').addEventListener('submit', function(e) {
             e.preventDefault();
+            debugLog('Testimonial form submitted...');
             
-            const name = document.getElementById('testimonial-name').value;
-            const rating = parseInt(document.getElementById('testimonial-rating').value);
-            const text = document.getElementById('testimonial-text').value;
-            
-            if (currentEditingTestimonial) {
-                // Update existing testimonial
-                currentEditingTestimonial.name = name;
-                currentEditingTestimonial.rating = rating;
-                currentEditingTestimonial.text = text;
-            } else {
-                // Add new testimonial
-                const newTestimonial = {
-                    id: Date.now(),
-                    name,
-                    rating,
-                    text
-                };
-                testimonials.push(newTestimonial);
+            try {
+                const name = document.getElementById('testimonial-name').value.trim();
+                const rating = parseInt(document.getElementById('testimonial-rating').value);
+                const text = document.getElementById('testimonial-text').value.trim();
+                
+                // Validation
+                if (!name || !rating || !text) {
+                    throw new Error('Semua field harus diisi!');
+                }
+                
+                if (rating < 1 || rating > 5) {
+                    throw new Error('Rating harus antara 1-5!');
+                }
+                
+                debugLog(`Testimonial data: ${name}, rating: ${rating}`);
+                
+                if (currentEditingTestimonial) {
+                    // Update existing testimonial
+                    debugLog(`Updating existing testimonial ID: ${currentEditingTestimonial.id}`);
+                    currentEditingTestimonial.name = name;
+                    currentEditingTestimonial.rating = rating;
+                    currentEditingTestimonial.text = text;
+                } else {
+                    // Add new testimonial
+                    debugLog('Adding new testimonial...');
+                    const newTestimonial = {
+                        id: Date.now(),
+                        name,
+                        rating,
+                        text
+                    };
+                    testimonials.push(newTestimonial);
+                    debugLog(`Testimonial added with ID: ${newTestimonial.id}, total testimonials: ${testimonials.length}`);
+                }
+                
+                saveData();
+                renderTestimonials();
+                updateCounts();
+                syncToFirebase();
+                closeModal('testimonial-modal');
+                
+                debugLog('Testimonial saved successfully');
+                
+            } catch (error) {
+                debugLog('Error saving testimonial: ' + error.message, 'error');
+                alert('Error menyimpan testimoni: ' + error.message);
             }
-            
-            saveData();
-            renderTestimonials();
-            syncToFirebase(); // This will trigger real-time update for all users
-            closeModal('testimonial-modal');
         });
 
         // Render Functions
         function renderProducts() {
+            debugLog(`Rendering ${products.length} products`);
+            
             const container = document.getElementById('products-container');
             container.innerHTML = '';
             
-            // Update product count in admin panel
-            const productCount = document.getElementById('product-count');
-            if (productCount) {
-                productCount.textContent = products.length;
+            if (products.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: white;">
+                        <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Belum ada produk yang ditambahkan.</p>
+                        ${isAdminLoggedIn ? '<p>Klik "Tambah Produk" untuk menambahkan produk pertama.</p>' : ''}
+                    </div>
+                `;
+                return;
             }
             
             products.forEach(product => {
@@ -2032,12 +1817,12 @@
                 productCard.className = 'product-card';
                 productCard.innerHTML = `
                     <div class="product-image ${product.image ? '' : 'placeholder'}">
-                        ${product.image ? `<img src="${product.image}" alt="${product.name}">` : '<i class="fas fa-image"></i>'}
+                        ${product.image ? `<img src="${product.image}" alt="${product.name}" onerror="this.style.display='none'; this.parentElement.classList.add('placeholder'); this.parentElement.innerHTML='<i class=\\'fas fa-image\\'></i>';">` : '<i class="fas fa-image"></i>'}
                     </div>
                     <div class="product-title">${product.name}</div>
                     <div class="product-price">Rp ${product.price.toLocaleString('id-ID')}</div>
                     <div class="product-description">${product.description}</div>
-                    ${product.variations.length > 0 ? `
+                    ${product.variations && product.variations.length > 0 ? `
                         <div class="variations">
                             <strong>Variasi:</strong>
                             ${product.variations.map(v => `
@@ -2048,11 +1833,11 @@
                             `).join('')}
                         </div>
                     ` : ''}
-                    <button class="order-btn" onclick="orderProduct('${product.name}')">
+                    <button class="order-btn" onclick="orderProduct('${product.name.replace(/'/g, "\\'")}')">
                         <i class="fab fa-whatsapp"></i>
                         Click to Order
                     </button>
-                    <div class="admin-controls">
+                    <div class="admin-controls ${isAdminLoggedIn ? 'visible' : ''}">
                         <button class="btn" onclick="openProductModal(${product.id})" style="flex: 1;">
                             <i class="fas fa-edit"></i> Edit
                         </button>
@@ -2064,26 +1849,24 @@
                 container.appendChild(productCard);
             });
             
-            // Show message if no products
-            if (products.length === 0) {
-                container.innerHTML = `
-                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: white;">
-                        <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.7;"></i>
-                        <h3>Belum ada produk</h3>
-                        <p style="opacity: 0.8;">Tambahkan produk pertama Anda!</p>
-                    </div>
-                `;
-            }
+            debugLog('Products rendered successfully');
         }
 
         function renderTestimonials() {
+            debugLog(`Rendering ${testimonials.length} testimonials`);
+            
             const container = document.getElementById('testimonials-container');
             container.innerHTML = '';
             
-            // Update testimonial count in admin panel
-            const testimonialCount = document.getElementById('testimonial-count');
-            if (testimonialCount) {
-                testimonialCount.textContent = testimonials.length;
+            if (testimonials.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>Belum ada testimoni yang ditambahkan.</p>
+                        ${isAdminLoggedIn ? '<p>Klik "Tambah Testimoni" untuk menambahkan testimoni pertama.</p>' : ''}
+                    </div>
+                `;
+                return;
             }
             
             testimonials.forEach(testimonial => {
@@ -2111,15 +1894,7 @@
                 container.appendChild(testimonialCard);
             });
             
-            // Show message if no testimonials
-            if (testimonials.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 2rem; color: white; opacity: 0.8;">
-                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <p>Belum ada testimoni. Tunggu review dari customer pertama!</p>
-                    </div>
-                `;
-            }
+            debugLog('Testimonials rendered successfully');
         }
 
         // WhatsApp Order Function
@@ -2127,6 +1902,7 @@
             const message = `Halo! Saya tertarik untuk memesan ${productName}. Bisa info lebih lanjut?`;
             const whatsappUrl = `https://wa.me/6282276882317?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
+            debugLog(`WhatsApp order initiated for: ${productName}`);
         }
 
         // Close modal when clicking outside
@@ -2196,10 +1972,15 @@
                         saveData();
                         if (isAdminLoggedIn) syncToFirebase();
                         updateFirebaseStatus('💾 Data saved manually!', false);
+                        debugLog('Manual save triggered via keyboard shortcut');
                         break;
                     case 'b':
                         e.preventDefault();
                         if (isAdminLoggedIn) backupData();
+                        break;
+                    case 'd':
+                        e.preventDefault();
+                        if (isAdminLoggedIn) toggleDebug();
                         break;
                 }
             }
@@ -2208,15 +1989,62 @@
         // Error handling for images
         document.addEventListener('error', function(e) {
             if (e.target.tagName === 'IMG') {
+                debugLog('Image load error: ' + e.target.src, 'error');
                 e.target.style.display = 'none';
                 e.target.parentElement.classList.add('placeholder');
                 e.target.parentElement.innerHTML = '<i class="fas fa-image"></i>';
             }
         }, true);
 
-        console.log('🍫 Choco.dubaiid website loaded successfully!');
-        console.log('📝 Features: Password-protected admin, Firebase integration, Image upload, Auto-backup');
-        console.log('🔑 Admin password hash is securely encoded');
+        // Page visibility API for better data management
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                debugLog('Page became visible - checking for updates');
+                // When page becomes visible, check for updates
+                setTimeout(() => {
+                    loadFromFirebase();
+                }, 1000);
+            }
+        });
+
+        // Network status monitoring
+        window.addEventListener('online', function() {
+            debugLog('Network came online');
+            updateFirebaseStatus('🌐 Network online - syncing...', false);
+            if (isAdminLoggedIn) {
+                setTimeout(() => {
+                    syncToFirebase();
+                }, 2000);
+            }
+        });
+
+        window.addEventListener('offline', function() {
+            debugLog('Network went offline', 'warn');
+            updateFirebaseStatus('⚠️ Offline mode - data saved locally', true);
+        });
+
+        // Enhanced localStorage monitoring
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'choco_dubai_data' && e.newValue !== e.oldValue) {
+                debugLog('LocalStorage updated from another tab');
+                loadData();
+                renderProducts();
+                renderTestimonials();
+                updateCounts();
+            }
+        });
+
+        // Performance monitoring
+        const startTime = performance.now();
+        window.addEventListener('load', function() {
+            const loadTime = performance.now() - startTime;
+            debugLog(`Page loaded in ${Math.round(loadTime)}ms`);
+        });
+
+        debugLog('🍫 Choco.dubaiid website script loaded successfully!');
+        debugLog('📝 Enhanced features: Debug mode, better error handling, data validation');
+        debugLog('🔧 Admin password: choco123');
+        
     </script>
 </body>
 </html>

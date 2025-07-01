@@ -618,6 +618,9 @@
                 <button class="btn" onclick="openProductModal()">
                     <i class="fas fa-plus"></i> Tambah Produk
                 </button>
+                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                    📝 Total Produk: <span id="product-count">${products ? products.length : 0}</span>
+                </div>
             </div>
 
             <div class="admin-section">
@@ -625,6 +628,9 @@
                 <button class="btn" onclick="openTestimonialModal()">
                     <i class="fas fa-plus"></i> Tambah Testimoni
                 </button>
+                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                    ⭐ Total Testimoni: <span id="testimonial-count">${testimonials ? testimonials.length : 0}</span>
+                </div>
             </div>
 
             <div class="admin-section">
@@ -1718,12 +1724,79 @@
         }
 
         function deleteProduct(id) {
-            if (confirm('Yakin ingin menghapus produk ini?')) {
-                products = products.filter(p => p.id !== id);
-                saveData();
-                renderProducts();
-                syncToFirebase(); // This will trigger real-time update for all users
+            // Enhanced delete confirmation
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            
+            const confirmDialog = document.createElement('div');
+            confirmDialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.8);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            confirmDialog.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
+                    <h3 style="color: #dc3545; margin-bottom: 1rem;">🗑️ Hapus Produk</h3>
+                    <p style="margin-bottom: 1rem;">Yakin ingin menghapus produk:</p>
+                    <p style="font-weight: bold; color: #333; margin-bottom: 1.5rem;">"${product.name}"</p>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem;">
+                        ⚠️ Tindakan ini tidak dapat dibatalkan dan akan menghapus produk dari semua customer!
+                    </p>
+                    <button onclick="confirmDeleteProduct(${id}); document.body.removeChild(this.parentElement.parentElement)" 
+                            style="background: #dc3545; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer; font-weight: bold;">
+                        🗑️ Ya, Hapus
+                    </button>
+                    <button onclick="document.body.removeChild(this.parentElement.parentElement)" 
+                            style="background: #6c757d; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer;">
+                        ❌ Batal
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(confirmDialog);
+        }
+        
+        function confirmDeleteProduct(id) {
+            console.log('🗑️ Deleting product with ID:', id);
+            
+            const productIndex = products.findIndex(p => p.id === id);
+            if (productIndex === -1) {
+                console.error('❌ Product not found');
+                return;
             }
+            
+            const deletedProduct = products[productIndex];
+            console.log('🗑️ Deleting product:', deletedProduct.name);
+            
+            // Remove from array
+            products.splice(productIndex, 1);
+            
+            // Save and sync
+            saveData();
+            renderProducts();
+            
+            // Sync to Firebase with success callback
+            syncToFirebase().then((success) => {
+                if (success) {
+                    showUpdateNotification(`🗑️ "${deletedProduct.name}" berhasil dihapus`, 'info');
+                    updateFirebaseStatus('✅ Produk dihapus dan disync', false);
+                } else {
+                    showUpdateNotification(`⚠️ "${deletedProduct.name}" dihapus lokal, sync gagal`, 'warning');
+                }
+            }).catch((error) => {
+                console.error('❌ Delete sync error:', error);
+                showUpdateNotification(`⚠️ "${deletedProduct.name}" dihapus lokal saja`, 'warning');
+            });
+            
+            console.log(`✅ Product deleted. Remaining products: ${products.length}`);
         }
 
         // Testimonial Management
@@ -1744,12 +1817,80 @@
         }
 
         function deleteTestimonial(id) {
-            if (confirm('Yakin ingin menghapus testimoni ini?')) {
-                testimonials = testimonials.filter(t => t.id !== id);
-                saveData();
-                renderTestimonials();
-                syncToFirebase(); // This will trigger real-time update for all users
+            // Enhanced delete confirmation for testimonials
+            const testimonial = testimonials.find(t => t.id === id);
+            if (!testimonial) return;
+            
+            const confirmDialog = document.createElement('div');
+            confirmDialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.8);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            confirmDialog.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
+                    <h3 style="color: #dc3545; margin-bottom: 1rem;">🗑️ Hapus Testimoni</h3>
+                    <p style="margin-bottom: 1rem;">Yakin ingin menghapus testimoni dari:</p>
+                    <p style="font-weight: bold; color: #333; margin-bottom: 0.5rem;">"${testimonial.name}"</p>
+                    <p style="color: #f39c12; margin-bottom: 1rem;">${'⭐'.repeat(testimonial.rating)}</p>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1.5rem; font-style: italic;">
+                        "${testimonial.text.substring(0, 50)}..."
+                    </p>
+                    <button onclick="confirmDeleteTestimonial(${id}); document.body.removeChild(this.parentElement.parentElement)" 
+                            style="background: #dc3545; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer; font-weight: bold;">
+                        🗑️ Ya, Hapus
+                    </button>
+                    <button onclick="document.body.removeChild(this.parentElement.parentElement)" 
+                            style="background: #6c757d; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 10px; margin: 0.25rem; cursor: pointer;">
+                        ❌ Batal
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(confirmDialog);
+        }
+        
+        function confirmDeleteTestimonial(id) {
+            console.log('🗑️ Deleting testimonial with ID:', id);
+            
+            const testimonialIndex = testimonials.findIndex(t => t.id === id);
+            if (testimonialIndex === -1) {
+                console.error('❌ Testimonial not found');
+                return;
             }
+            
+            const deletedTestimonial = testimonials[testimonialIndex];
+            console.log('🗑️ Deleting testimonial from:', deletedTestimonial.name);
+            
+            // Remove from array
+            testimonials.splice(testimonialIndex, 1);
+            
+            // Save and sync
+            saveData();
+            renderTestimonials();
+            
+            // Sync to Firebase with success callback
+            syncToFirebase().then((success) => {
+                if (success) {
+                    showUpdateNotification(`🗑️ Testimoni dari "${deletedTestimonial.name}" dihapus`, 'info');
+                    updateFirebaseStatus('✅ Testimoni dihapus dan disync', false);
+                } else {
+                    showUpdateNotification(`⚠️ Testimoni dihapus lokal, sync gagal`, 'warning');
+                }
+            }).catch((error) => {
+                console.error('❌ Delete sync error:', error);
+                showUpdateNotification(`⚠️ Testimoni dihapus lokal saja`, 'warning');
+            });
+            
+            console.log(`✅ Testimonial deleted. Remaining testimonials: ${testimonials.length}`);
         }
 
         // Form Handlers with better error handling
@@ -1880,6 +2021,12 @@
             const container = document.getElementById('products-container');
             container.innerHTML = '';
             
+            // Update product count in admin panel
+            const productCount = document.getElementById('product-count');
+            if (productCount) {
+                productCount.textContent = products.length;
+            }
+            
             products.forEach(product => {
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
@@ -1916,11 +2063,28 @@
                 `;
                 container.appendChild(productCard);
             });
+            
+            // Show message if no products
+            if (products.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: white;">
+                        <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.7;"></i>
+                        <h3>Belum ada produk</h3>
+                        <p style="opacity: 0.8;">Tambahkan produk pertama Anda!</p>
+                    </div>
+                `;
+            }
         }
 
         function renderTestimonials() {
             const container = document.getElementById('testimonials-container');
             container.innerHTML = '';
+            
+            // Update testimonial count in admin panel
+            const testimonialCount = document.getElementById('testimonial-count');
+            if (testimonialCount) {
+                testimonialCount.textContent = testimonials.length;
+            }
             
             testimonials.forEach(testimonial => {
                 const testimonialCard = document.createElement('div');
@@ -1946,6 +2110,16 @@
                 `;
                 container.appendChild(testimonialCard);
             });
+            
+            // Show message if no testimonials
+            if (testimonials.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: white; opacity: 0.8;">
+                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>Belum ada testimoni. Tunggu review dari customer pertama!</p>
+                    </div>
+                `;
+            }
         }
 
         // WhatsApp Order Function

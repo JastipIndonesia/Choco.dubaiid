@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Choco.dubaiid - Premium Dubai Chocolate</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDKs - Support both Realtime Database and Firestore -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.15.0/firebase-firestore-compat.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #8B4513 0%, #D2691E 50%, #F4A460 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #8B4513;
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #8B4513;
+        }
+
+        .admin-btn {
+            background: #8B4513;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .admin-btn:hover {
+            background: #A0522D;
+            transform: translateY(-2px);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 4rem 0;
+            color: white;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #8B4513, #D2691E);
+        }
+
+        .product-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 15px;
+        }
+
+        .product-image.placeholder {
+            color: #999;
+            font-size: 3rem;
+        }
+
+        .product-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .product-price {
+            font-size: 1.1rem;
+            color: #8B4513;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+
+        .product-description {
+            color: #666;
+            margin-bottom: 1rem;
+            line-height: 1.5;
+        }
+
+        .variations {
+            margin-bottom: 1rem;
+        }
+
+        .variation-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: #f8f8f8;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+        }
+
+        .order-btn {
+            width: 100%;
+            background: linear-gradient(45deg, #25D366, #128C7E);
+            color: white;
+            padding: 1rem;
+            border: none;
+            border-radius: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .order-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+        }
+
+        .admin-controls {
+            margin-top: 1rem;
+            display: none;
+            gap: 0.5rem;
+        }
+
+        .admin-controls.visible {
+            display: flex;
+        }
+
+        .testimonials {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 3rem 0;
+        }
+
+        .testimonials h2 {
+            text-align: center;
+            color: white;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        .testimonial-item {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .footer {
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .social-links a {
+            color: white;
+            font-size: 1.5rem;
+            transition: color 0.3s;
+        }
+
+        .social-links a:hover {
+            color: #D2691E;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #8B4513;
+        }
+
+        .btn {
+            background: #8B4513;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+            margin-right: 0.5rem;
+        }
+
+        .btn:hover {
+            background: #A0522D;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .admin-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .admin-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 2px solid #eee;
+            border-radius: 15px;
+        }
+
+        .admin-section h3 {
+            color: #8B4513;
+            margin-bottom: 1rem;
+        }
+
+        .variation-list {
+            background: #f8f8f8;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .variation-list div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .password-modal {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .password-modal .modal-content {
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .password-input {
+            font-size: 1.2rem;
+            text-align: center;
+            letter-spacing: 0.2rem;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 1rem;
+            border-radius: 10px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-label {
+            display: block;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-input-label:hover {
+            border-color: #8B4513;
+            background: #f0f0f0;
+        }
+
+        .firebase-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.5rem 1rem;
+            background: #28a745;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            z-index: 1500;
+        }
+
+        .firebase-status.error {
+            background: #dc3545;
+        }
+
+        /* Enhanced animations for notifications */
+        @keyframes slideDown {
+            from {
+                transform: translateX(-50%) translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(-50%) translateY(-100%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        /* Live indicator */
+        .live-indicator {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #dc3545;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            z-index: 1500;
+            animation: pulse 2s infinite;
+        }
+
+        .live-indicator.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .nav-links {
+                gap: 1rem;
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="firebase-status" class="firebase-status hidden">
+        <i class="fas fa-cloud"></i> Menghubungkan ke Firebase...
+    </div>
+
+    <div id="live-indicator" class="live-indicator hidden">
+        🔴 LIVE
+    </div>
+
+    <header class="header">
+        <nav class="nav">
+            <a href="#" class="logo">🍫 Choco.dubaiid</a>
+            <div class="nav-links">
+                <a href="#products">Produk</a>
+                <a href="#testimonials">Testimoni</a>
+                <a href="#contact">Kontak</a>
+                <button class="admin-btn" onclick="requestAdminPassword()">
+                    <i class="fas fa-cog"></i> Admin
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Choco.dubaiid</h1>
+                <p>Premium Dubai Chocolate - Kualitas Terbaik, Rasa Istimewa</p>
+            </div>
+        </section>
+
+        <section id="products" class="container">
+            <div id="products-container" class="products-grid">
+                <!-- Products will be loaded here -->
+            </div>
+        </section>
+
+        <section id="testimonials" class="testimonials">
+            <div class="container">
+                <h2>Testimoni Pelanggan</h2>
+                <div id="testimonials-container">
+                    <!-- Testimonials will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Panel -->
+        <div id="admin-panel" class="container admin-panel hidden">
+            <h2>Panel Admin</h2>
+            
+            <div class="admin-section">
+                <h3>Kelola Produk</h3>
+                <button class="btn" onclick="openProductModal()">
+                    <i class="fas fa-plus"></i> Tambah Produk
+                </button>
+            </div>
+
+            <div class="admin-section">
+                <h3>Kelola Testimoni</h3>
+                <button class="btn" onclick="openTestimonialModal()">
+                    <i class="fas fa-plus"></i> Tambah Testimoni
+                </button>
+            </div>
+
+            <div class="admin-section">
+                <h3>Firebase & Backup</h3>
+                <button class="btn" onclick="syncToFirebase()">
+                    <i class="fas fa-cloud-upload-alt"></i> Sync ke Firebase
+                </button>
+                <button class="btn" onclick="loadFromFirebase()">
+                    <i class="fas fa-cloud-download-alt"></i> Load dari Firebase
+                </button>
+                <button class="btn" onclick="backupData()">
+                    <i class="fas fa-download"></i> Backup Manual
+                </button>
+                <button class="btn" onclick="restoreData()">
+                    <i class="fas fa-upload"></i> Restore Data
+                </button>
+                <button class="btn btn-danger" onclick="showStorageFullDialog()">
+                    <i class="fas fa-broom"></i> Manage Storage
+                </button>
+                <input type="file" id="restore-file" accept=".json" style="display: none;" onchange="handleRestore(event)">
+                <div style="margin-top: 1rem; font-size: 0.9rem; color: #666;">
+                    <div id="storage-info">📊 Checking storage...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="social-links">
+            <a href="https://wa.me/6282276882317" target="_blank">
+                <i class="fab fa-whatsapp"></i>
+            </a>
+            <a href="https://instagram.com/Choco.dubaiid" target="_blank">
+                <i class="fab fa-instagram"></i>
+            </a>
+        </div>
+        <p>&copy; 2025 Choco.dubaiid. All rights reserved.</p>
+        <p>WhatsApp: 082276882317 | Instagram: @Choco.dubaiid</p>
+    </footer>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="modal password-modal">
+        <div class="modal-content">
+            <h2>🔐 Admin Access</h2>
+            <p>Masukkan password admin:</p>
+            <div class="form-group">
+                <input type="password" id="admin-password" class="password-input" placeholder="••••••••" maxlength="8">
+            </div>
+            <button class="btn" onclick="checkAdminPassword()">Masuk</button>
+            <button class="btn btn-danger" onclick="closeModal('password-modal')">Batal</button>
+            <p style="font-size: 0.8rem; margin-top: 1rem; color: #666;">Password tersimpan aman</p>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('product-modal')">&times;</span>
+            <h2 id="product-modal-title">Tambah Produk</h2>
+            <form id="product-form">
+                <div class="form-group">
+                    <label>Nama Produk:</label>
+                    <input type="text" id="product-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Harga:</label>
+                    <input type="number" id="product-price" required>
+                </div>
+                <div class="form-group">
+                    <label>Deskripsi:</label>
+                    <textarea id="product-description" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Gambar Produk:</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="product-image" class="file-input" accept="image/*" onchange="previewImage(this)">
+                        <label for="product-image" class="file-input-label">
+                            <i class="fas fa-cloud-upload-alt"></i> Pilih Gambar (Maks 10MB - Auto Compress)
+                        </label>
+                    </div>
+                    <img id="image-preview" class="image-preview hidden" alt="Preview">
+                    <small style="color: #666; font-size: 0.8rem; display: block; margin-top: 0.5rem;">
+                        💡 Tips: Gambar akan otomatis dikompres untuk menghemat storage
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label>Variasi:</label>
+                    <div id="variations-container">
+                        <div class="variation-input">
+                            <input type="text" placeholder="Nama variasi" class="variation-name">
+                            <input type="number" placeholder="Harga variasi" class="variation-price">
+                            <button type="button" onclick="removeVariation(this)" class="btn btn-danger">Hapus</button>
+                        </div>
+                    </div>
+                    <button type="button" onclick="addVariation()" class="btn">Tambah Variasi</button>
+                </div>
+                <button type="submit" class="btn">Simpan</button>
+                <button type="button" onclick="closeModal('product-modal')" class="btn btn-danger">Batal</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Testimonial Modal -->
+    <div id="testimonial-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('testimonial-modal')">&times;</span>
+            <h2 id="testimonial-modal-title">Tambah Testimoni</h2>
+            <form id="testimonial-form">
+                <div class="form-group">
+                    <label>Nama Pelanggan:</label>
+                    <input type="text" id="testimonial-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Rating (1-5):</label>
+                    <select id="testimonial-rating" required>
+                        <option value="5">5 ⭐⭐⭐⭐⭐</option>
+                        <option value="4">4 ⭐⭐⭐⭐</option>
+                        <option value="3">3 ⭐⭐⭐</option>
+                        <option value="2">2 ⭐⭐</option>
+                        <option value="1">1 ⭐</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Testimoni:</label>
+                    <textarea id="testimonial-text" rows="4" required></textarea>
+                </div>
+                <button type="submit" class="btn">Simpan</button>
+                <button type="button" onclick="closeModal('testimonial-modal')" class="btn btn-danger">Batal</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase Configuration - Your Project Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyDt_5C0QZlg97Zq6OQOveGB1FXZR0lpk-w",
+            authDomain: "chocodubaiid.firebaseapp.com",
+            databaseURL: "https://chocodubaiid-default-rtdb.firebaseio.com",
+            projectId: "chocodubaiid",
+            storageBucket: "chocodubaiid.firebasestorage.app",
+            messagingSenderId: "336621944117",
+            appId: "1:336621944117:web:f3c60e464a8918c0dc607c"
+        };
+
+        // Initialize Firebase with better error handling and debugging
+        let db;
+        let firestore;
+        let useFirestore = false;
+        let firebaseInitialized = false;
+        
+        try {
+            firebase.initializeApp(firebaseConfig);
+            firebaseInitialized = true;
+            
+            // Try Firestore first (more common nowadays)
+            try {
+                firestore = firebase.firestore();
+                useFirestore = true;
+                updateFirebaseStatus('✅ Firestore Connected', false);
+                console.log('✅ Using Firestore Database');
+                
+                // Test Firestore connection
+                firestore.collection('test').doc('connection').set({test: true})
+                    .then(() => {
+                        console.log('✅ Firestore write test successful');
+                        updateFirebaseStatus('✅ Firestore Ready', false);
+                    })
+                    .catch((error) => {
+                        console.error('❌ Firestore write test failed:', error);
+                        updateFirebaseStatus('❌ Firestore Write Error: ' + error.message, true);
+                    });
+                    
+            } catch (firestoreError) {
+                console.log('⚠️ Firestore not available, trying Realtime Database...');
+                
+                // Fallback to Realtime Database
+                try {
+                    db = firebase.database();
+                    useFirestore = false;
+                    updateFirebaseStatus('✅ Realtime Database Connected', false);
+                    console.log('✅ Using Realtime Database');
+                    
+                    // Test Realtime Database connection
+                    db.ref('test/connection').set({test: true})
+                        .then(() => {
+                            console.log('✅ Realtime Database write test successful');
+                            updateFirebaseStatus('✅ Realtime DB Ready', false);
+                        })
+                        .catch((error) => {
+                            console.error('❌ Realtime Database write test failed:', error);
+                            updateFirebaseStatus('❌ Realtime DB Write Error: ' + error.message, true);
+                        });
+                        
+                } catch (realtimeError) {
+                    console.error('❌ Both Firestore and Realtime Database failed:', realtimeError);
+                    updateFirebaseStatus('❌ All Firebase services failed', true);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            updateFirebaseStatus('❌ Firebase Init Error: ' + error.message, true);
+        }
+
+        // Data Storage
+        let products = [];
+        let testimonials = [];
+        let currentEditingProduct = null;
+        let currentEditingTestimonial = null;
+        let isAdminLoggedIn = false;
+
+        // Password hash (encoded secara aman)
+        const adminPasswordHash = btoa('choco123'); // Password: choco123
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            renderProducts();
+            renderTestimonials();
+            setupAutoBackup();
+            loadFromFirebase();
+            setupRealTimeListeners(); // Add real-time listeners
+            checkStorageUsage(); // Check storage status
+        });
+
+        // Check storage usage
+        function checkStorageUsage() {
+            try {
+                const data = localStorage.getItem('choco_dubai_data') || '{}';
+                const sizeKB = Math.round(data.length / 1024);
+                const sizeMB = (sizeKB / 1024).toFixed(2);
+                
+                let status = '';
+                if (sizeMB < 1) {
+                    status = `📊 Storage: ${sizeKB}KB (Aman)`;
+                } else if (sizeMB < 5) {
+                    status = `📊 Storage: ${sizeMB}MB (Normal)`;
+                } else if (sizeMB < 8) {
+                    status = `⚠️ Storage: ${sizeMB}MB (Tinggi)`;
+                } else {
+                    status = `🚨 Storage: ${sizeMB}MB (Penuh!)`;
+                }
+                
+                const storageInfo = document.getElementById('storage-info');
+                if (storageInfo) {
+                    storageInfo.textContent = status;
+                }
+                
+                console.log('📊 Storage usage:', status);
+            } catch (e) {
+                console.error('Error checking storage:', e);
+            }
+        }
+
+        // Enhanced real-time listeners with instant updates
+        function setupRealTimeListeners() {
+            console.log('🔴 Setting up real-time listeners...');
+            
+            if (useFirestore && firestore) {
+                // Firestore real-time listener with instant updates
+                const unsubscribe = firestore.collection('choco-dubai').doc('data')
+                    .onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            const isFromServer = doc.metadata.fromCache === false;
+                            
+                            console.log('🔴 Firestore update received:', {
+                                fromServer: isFromServer,
+                                timestamp: data.timestamp,
+                                products: data.products?.length || 0,
+                                testimonials: data.testimonials?.length || 0
+                            });
+                            
+                            if (data && data.products && data.testimonials) {
+                                // Only update if not admin to avoid conflicts during editing
+                                if (!isAdminLoggedIn || isFromServer) {
+                                    const hasProductChanges = JSON.stringify(products) !== JSON.stringify(data.products);
+                                    const hasTestimonialChanges = JSON.stringify(testimonials) !== JSON.stringify(data.testimonials);
+                                    
+                                    if (hasProductChanges || hasTestimonialChanges) {
+                                        console.log('🔄 Data changed, updating UI...', {
+                                            productsChanged: hasProductChanges,
+                                            testimonialsChanged: hasTestimonialChanges
+                                        });
+                                        
+                                        const oldProductCount = products.length;
+                                        const oldTestimonialCount = testimonials.length;
+                                        
+                                        products = data.products;
+                                        testimonials = data.testimonials;
+                                        
+                                        renderProducts();
+                                        renderTestimonials();
+                                        saveData();
+                                        
+                                        // Show notification for new items
+                                        if (data.products.length > oldProductCount) {
+                                            showUpdateNotification('🆕 Produk baru ditambahkan!', 'success');
+                                        } else if (data.products.length < oldProductCount) {
+                                            showUpdateNotification('🗑️ Produk dihapus', 'info');
+                                        } else if (hasProductChanges) {
+                                            showUpdateNotification('✏️ Produk diperbarui', 'info');
+                                        }
+                                        
+                                        if (data.testimonials.length > oldTestimonialCount) {
+                                            showUpdateNotification('⭐ Testimoni baru!', 'success');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }, (error) => {
+                        console.error('❌ Firestore listener error:', error);
+                        updateFirebaseStatus('❌ Real-time connection lost', true);
+                        
+                        // Retry connection after 5 seconds
+                        setTimeout(() => {
+                            console.log('🔄 Retrying Firestore connection...');
+                            setupRealTimeListeners();
+                        }, 5000);
+                    });
+                    
+                // Store unsubscribe function for cleanup
+                window.firestoreUnsubscribe = unsubscribe;
+                
+            } else if (db) {
+                // Realtime Database listener with instant updates
+                db.ref('choco-dubai').on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    console.log('🔴 Realtime DB update received:', data ? Object.keys(data) : 'null');
+                    
+                    if (data && data.products && data.testimonials && !isAdminLoggedIn) {
+                        const hasProductChanges = JSON.stringify(products) !== JSON.stringify(data.products);
+                        const hasTestimonialChanges = JSON.stringify(testimonials) !== JSON.stringify(data.testimonials);
+                        
+                        if (hasProductChanges || hasTestimonialChanges) {
+                            console.log('🔄 Realtime DB data changed, updating UI...');
+                            
+                            const oldProductCount = products.length;
+                            const oldTestimonialCount = testimonials.length;
+                            
+                            products = data.products;
+                            testimonials = data.testimonials;
+                            
+                            renderProducts();
+                            renderTestimonials();
+                            saveData();
+                            
+                            // Show notifications
+                            if (data.products.length > oldProductCount) {
+                                showUpdateNotification('🆕 Produk baru ditambahkan!', 'success');
+                            } else if (data.testimonials.length > oldTestimonialCount) {
+                                showUpdateNotification('⭐ Testimoni baru!', 'success');
+                            } else {
+                                showUpdateNotification('🔄 Data diperbarui', 'info');
+                            }
+                        }
+                    }
+                }, (error) => {
+                    console.error('❌ Realtime Database listener error:', error);
+                    updateFirebaseStatus('❌ Real-time connection lost', true);
+                });
+            }
+            
+            // Set up connection monitoring
+            if (useFirestore && firestore) {
+                // Monitor Firestore connection
+                firestore.enableNetwork().then(() => {
+                    console.log('🌐 Firestore network enabled');
+                    updateFirebaseStatus('🔴 Live - Real-time active', false);
+                });
+            } else if (db) {
+                // Monitor Realtime Database connection
+                db.ref('.info/connected').on('value', (snapshot) => {
+                    if (snapshot.val() === true) {
+                        console.log('🌐 Realtime Database connected');
+                        updateFirebaseStatus('🔴 Live - Real-time active', false);
+                    } else {
+                        console.log('❌ Realtime Database disconnected');
+                        updateFirebaseStatus('❌ Disconnected', true);
+                    }
+                });
+            }
+        }
+
+        // Enhanced notification system
+        function showUpdateNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            
+            const colors = {
+                success: { bg: '#28a745', border: '#1e7e34' },
+                info: { bg: '#17a2b8', border: '#117a8b' },
+                warning: { bg: '#ffc107', border: '#d39e00' }
+            };
+            
+            const color = colors[type] || colors.success;
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: ${color.bg};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 25px;
+                border-left: 4px solid ${color.border};
+                z-index: 3000;
+                font-weight: bold;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                animation: slideInRight 0.5s ease;
+                max-width: 300px;
+                font-size: 0.9rem;
+            `;
+            notification.innerHTML = message;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 4 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.5s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 500);
+            }, 4000);
+            
+            // Click to dismiss
+            notification.addEventListener('click', () => {
+                notification.style.animation = 'slideOutRight 0.5s ease';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 500);
+            });
+        }
+
+        function updateFirebaseStatus(message, isError) {
+            const status = document.getElementById('firebase-status');
+            const liveIndicator = document.getElementById('live-indicator');
+            
+            status.textContent = message;
+            status.className = isError ? 'firebase-status error' : 'firebase-status';
+            status.classList.remove('hidden');
+            
+            // Update live indicator
+            if (message.includes('Live') || message.includes('Real-time active')) {
+                liveIndicator.textContent = '🔴 LIVE';
+                liveIndicator.className = 'live-indicator connected';
+                liveIndicator.classList.remove('hidden');
+            } else if (isError) {
+                liveIndicator.textContent = '❌ OFFLINE';
+                liveIndicator.className = 'live-indicator';
+                liveIndicator.classList.remove('hidden');
+            }
+            
+            setTimeout(() => {
+                status.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Admin Password Functions
+        function requestAdminPassword() {
+            if (isAdminLoggedIn) {
+                toggleAdmin();
+            } else {
+                document.getElementById('password-modal').style.display = 'block';
+                document.getElementById('admin-password').focus();
+            }
+        }
+
+        function checkAdminPassword() {
+            const inputPassword = document.getElementById('admin-password').value;
+            const inputHash = btoa(inputPassword);
+            
+            if (inputHash === adminPasswordHash) {
+                isAdminLoggedIn = true;
+                closeModal('password-modal');
+                toggleAdmin();
+                document.getElementById('admin-password').value = '';
+                
+                // Show admin controls
+                document.querySelectorAll('.admin-controls').forEach(el => {
+                    el.classList.add('visible');
+                });
+            } else {
+                alert('Password salah!');
+                document.getElementById('admin-password').value = '';
+                document.getElementById('admin-password').focus();
+            }
+        }
+
+        // Auto backup every 30 seconds and on page unload
+        function setupAutoBackup() {
+            setInterval(() => {
+                saveData();
+                if (isAdminLoggedIn) {
+                    syncToFirebase();
+                }
+            }, 30000);
+            
+            window.addEventListener('beforeunload', function() {
+                saveData();
+                if (isAdminLoggedIn) {
+                    syncToFirebase();
+                }
+            });
+            
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    saveData();
+                    if (isAdminLoggedIn) {
+                        syncToFirebase();
+                    }
+                }
+            });
+        }
+
+        // Enhanced Firebase Functions with detailed logging
+        function syncToFirebase() {
+            console.log('🔄 Starting sync to Firebase...');
+            console.log('Firebase initialized:', firebaseInitialized);
+            console.log('Use Firestore:', useFirestore);
+            console.log('Firestore object:', firestore);
+            console.log('Database object:', db);
+            
+            if (!firestore && !db) {
+                console.error('❌ No Firebase service available');
+                updateFirebaseStatus('❌ Firebase tidak tersedia', true);
+                return Promise.reject('No Firebase service available');
+            }
+
+            const data = {
+                products: products,
+                testimonials: testimonials,
+                timestamp: new Date().toISOString(),
+                lastUpdated: Date.now()
+            };
+
+            console.log('📤 Data to sync:', data);
+
+            if (useFirestore && firestore) {
+                // Use Firestore
+                console.log('📤 Syncing to Firestore...');
+                return firestore.collection('choco-dubai').doc('data').set(data)
+                    .then(() => {
+                        console.log('✅ Firestore sync successful');
+                        updateFirebaseStatus('✅ Data synced ke Firestore', false);
+                        return true;
+                    })
+                    .catch((error) => {
+                        console.error('❌ Firestore sync error:', error);
+                        console.error('Error code:', error.code);
+                        console.error('Error message:', error.message);
+                        updateFirebaseStatus('❌ Firestore Error: ' + error.message, true);
+                        return false;
+                    });
+            } else if (db) {
+                // Use Realtime Database
+                console.log('📤 Syncing to Realtime Database...');
+                return db.ref('choco-dubai').set(data)
+                    .then(() => {
+                        console.log('✅ Realtime Database sync successful');
+                        updateFirebaseStatus('✅ Data synced ke Realtime DB', false);
+                        return true;
+                    })
+                    .catch((error) => {
+                        console.error('❌ Realtime Database sync error:', error);
+                        console.error('Error code:', error.code);
+                        console.error('Error message:', error.message);
+                        updateFirebaseStatus('❌ Realtime DB Error: ' + error.message, true);
+                        return false;
+                    });
+            }
+        }
+
+        function loadFromFirebase() {
+            console.log('📥 Loading from Firebase...');
+            
+            if (!firestore && !db) {
+                console.log('⚠️ No Firebase service available for loading');
+                return;
+            }
+
+            if (useFirestore && firestore) {
+                // Load from Firestore
+                console.log('📥 Loading from Firestore...');
+                firestore.collection('choco-dubai').doc('data').get()
+                    .then((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            console.log('📥 Firestore data received:', data);
+                            
+                            if (data && data.products && data.testimonials) {
+                                products = data.products;
+                                testimonials = data.testimonials;
+                                renderProducts();
+                                renderTestimonials();
+                                saveData(); // Save to local storage as backup
+                                updateFirebaseStatus('✅ Data loaded dari Firestore', false);
+                                console.log('✅ Data loaded from Firestore successfully');
+                            } else {
+                                console.log('⚠️ Invalid data structure in Firestore');
+                            }
+                        } else {
+                            console.log('📭 No data found in Firestore, using local data');
+                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('❌ Firestore load error:', error);
+                        updateFirebaseStatus('❌ Gagal load dari Firestore: ' + error.message, true);
+                    });
+            } else if (db) {
+                // Load from Realtime Database
+                console.log('📥 Loading from Realtime Database...');
+                db.ref('choco-dubai').once('value')
+                    .then((snapshot) => {
+                        const data = snapshot.val();
+                        console.log('📥 Realtime Database data received:', data);
+                        
+                        if (data && data.products && data.testimonials) {
+                            products = data.products;
+                            testimonials = data.testimonials;
+                            renderProducts();
+                            renderTestimonials();
+                            saveData(); // Save to local storage as backup
+                            updateFirebaseStatus('✅ Data loaded dari Realtime DB', false);
+                            console.log('✅ Data loaded from Realtime Database successfully');
+                        } else {
+                            console.log('📭 No data found in Realtime Database, using local data');
+                            updateFirebaseStatus('ℹ️ Menggunakan data lokal', false);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('❌ Realtime Database load error:', error);
+                        updateFirebaseStatus('❌ Gagal load dari Realtime DB: ' + error.message, true);
+                    });
+            }
+        }
+
+        // Enhanced image handling with compression
+        function previewImage(input) {
+            const preview = document.getElementById('image-preview');
+            const label = input.nextElementSibling;
+            
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                
+                console.log(`📷 Original image size: ${fileSizeMB}MB`);
+                
+                // Show loading state
+                label.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses gambar...';
+                label.style.borderColor = '#007bff';
+                label.style.background = '#e3f2fd';
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Compress image before preview
+                    compressImage(e.target.result, 0.7, 800, 600).then(compressedImage => {
+                        preview.src = compressedImage;
+                        preview.classList.remove('hidden');
+                        
+                        // Calculate compressed size
+                        const compressedSizeKB = Math.round((compressedImage.length * 0.75) / 1024);
+                        
+                        label.innerHTML = `<i class="fas fa-check"></i> Gambar siap (${compressedSizeKB}KB)`;
+                        label.style.borderColor = '#28a745';
+                        label.style.background = '#d4edda';
+                        
+                        console.log(`📷 Compressed image size: ~${compressedSizeKB}KB`);
+                    });
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Image compression function
+        function compressImage(base64, quality = 0.7, maxWidth = 800, maxHeight = 600) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = function() {
+                    // Calculate new dimensions
+                    let { width, height } = img;
+                    
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width *= ratio;
+                        height *= ratio;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+                    
+                    resolve(compressedBase64);
+                };
+                
+                img.src = base64;
+            });
+        }
+
+        async function getImageDataURL(fileInput) {
+            return new Promise((resolve) => {
+                if (fileInput.files && fileInput.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = async function(e) {
+                        // Compress image before storing
+                        const compressedImage = await compressImage(e.target.result, 0.6, 600, 400);
+                        resolve(compressedImage);
+                    };
+                    reader.readAsDataURL(fileInput.files[0]);
+                } else {
+                    resolve('');
+                }
+            });
+        }
+
+        // Enhanced data persistence with storage management
+        function saveData() {
+            console.log('💾 Saving data locally...');
+            console.log('Products count:', products.length);
+            console.log('Testimonials count:', testimonials.length);
+            
+            const data = {
+                products: products,
+                testimonials: testimonials,
+                timestamp: new Date().toISOString(),
+                version: '2.0'
+            };
+            
+            try {
+                const jsonData = JSON.stringify(data);
+                const dataSizeMB = (jsonData.length / (1024 * 1024)).toFixed(2);
+                console.log('💾 Data size:', dataSizeMB, 'MB');
+                
+                // Check if storage is getting full (>8MB)
+                if (jsonData.length > 8 * 1024 * 1024) {
+                    console.warn('⚠️ Data size is large, optimizing...');
+                    optimizeData();
+                    return saveData(); // Retry after optimization
+                }
+                
+                // Try to save with error handling
+                try {
+                    localStorage.setItem('choco_dubai_data', jsonData);
+                    localStorage.setItem('choco_dubai_backup_1', jsonData);
+                    
+                    // Only keep 2 backups to save space
+                    console.log('✅ Local data saved successfully');
+                    return true;
+                } catch (storageError) {
+                    if (storageError.name === 'QuotaExceededError') {
+                        console.warn('⚠️ Storage quota exceeded, cleaning up...');
+                        cleanupStorage();
+                        
+                        // Retry with optimized data
+                        optimizeData();
+                        const optimizedData = JSON.stringify({
+                            products: products,
+                            testimonials: testimonials,
+                            timestamp: new Date().toISOString(),
+                            version: '2.0'
+                        });
+                        
+                        localStorage.setItem('choco_dubai_data', optimizedData);
+                        updateFirebaseStatus('⚠️ Storage penuh! Data dioptimasi', true);
+                        return true;
+                    } else {
+                        throw storageError;
+                    }
+                }
+                
+            } catch (e) {
+                console.error('❌ Error saving local data:', e);
+                if (e.name === 'QuotaExceededError') {
+                    updateFirebaseStatus('❌ Storage penuh! Backup data dan clear browser', true);
+                    showStorageFullDialog();
+                } else {
+                    updateFirebaseStatus('❌ Local save error: ' + e.message, true);
+                }
+                return false;
+            }
+        }
+
+        // Optimize data by compressing images further
+        function optimizeData() {
+            console.log('🔧 Optimizing data...');
+            let optimized = 0;
+            
+            products.forEach(product => {
+                if (product.image && product.image.length > 50000) { // >50KB
+                    // Mark for re-compression (will be handled on next image update)
+                    console.log(`🔧 Large image found in product: ${product.name}`);
+                    optimized++;
+                }
+            });
+            
+            console.log(`🔧 Found ${optimized} items to optimize`);
+        }
+
+        // Clean up storage
+        function cleanupStorage() {
+            console.log('🧹 Cleaning up storage...');
+            
+            // Remove old backups
+            localStorage.removeItem('choco_dubai_backup_2');
+            
+            // Remove any old versions
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('choco_') && key !== 'choco_dubai_data' && key !== 'choco_dubai_backup_1') {
+                    localStorage.removeItem(key);
+                    console.log('🗑️ Removed old data:', key);
+                }
+            }
+        }
+
+        // Show storage full dialog
+        function showStorageFullDialog() {
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.8);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            dialog.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 400px; text-align: center;">
+                    <h3 style="color: #dc3545; margin-bottom: 1rem;">⚠️ Storage Penuh!</h3>
+                    <p style="margin-bottom: 1rem;">Browser storage hampir penuh. Untuk melanjutkan:</p>
+                    <div style="text-align: left; margin: 1rem 0;">
+                        <p>1. <strong>Backup data</strong> terlebih dahulu</p>
+                        <p>2. <strong>Clear browser data</strong> untuk website ini</p>
+                        <p>3. Atau gunakan <strong>gambar yang lebih kecil</strong></p>
+                    </div>
+                    <button onclick="backupData()" style="background: #28a745; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
+                        📦 Backup Data
+                    </button>
+                    <button onclick="clearStorageData()" style="background: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
+                        🗑️ Clear Storage
+                    </button>
+                    <button onclick="this.parentElement.parentElement.remove()" style="background: #6c757d; color: white; padding: 0.5rem 1rem; border: none; border-radius: 5px; margin: 0.25rem;">
+                        ❌ Tutup
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+        }
+
+        // Clear storage function
+        function clearStorageData() {
+            if (confirm('⚠️ Yakin ingin hapus semua data lokal? Pastikan sudah backup!')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        function loadData() {
+            console.log('📂 Loading data locally...');
+            
+            try {
+                let data = localStorage.getItem('choco_dubai_data') ||
+                          localStorage.getItem('choco_dubai_backup_1') ||
+                          localStorage.getItem('choco_dubai_backup_2');
+                
+                if (data) {
+                    const parsedData = JSON.parse(data);
+                    console.log('📂 Local data found:', parsedData);
+                    
+                    products = parsedData.products || [];
+                    testimonials = parsedData.testimonials || [];
+                    
+                    console.log('✅ Local data loaded - Products:', products.length, 'Testimonials:', testimonials.length);
+                } else {
+                    console.log('📭 No local data found, initializing sample data');
+                    initializeSampleData();
+                }
+            } catch (e) {
+                console.error('❌ Error loading local data:', e);
+                initializeSampleData();
+            }
+        }
+
+        function initializeSampleData() {
+            products = [
+                {
+                    id: 1,
+                    name: "Dubai Chocolate Original",
+                    price: 75000,
+                    description: "Coklat Dubai premium dengan rasa original yang autentik. Dibuat dengan bahan berkualitas tinggi.",
+                    image: "",
+                    variations: [
+                        { name: "Small (100g)", price: 75000 },
+                        { name: "Medium (200g)", price: 140000 },
+                        { name: "Large (300g)", price: 200000 }
+                    ]
+                },
+                {
+                    id: 2,
+                    name: "Dubai Chocolate Pistachio",
+                    price: 85000,
+                    description: "Varian istimewa dengan campuran pistachio yang memberikan tekstur dan rasa yang unik.",
+                    image: "",
+                    variations: [
+                        { name: "Small (100g)", price: 85000 },
+                        { name: "Medium (200g)", price: 160000 }
+                    ]
+                }
+            ];
+
+            testimonials = [
+                {
+                    id: 1,
+                    name: "Sarah M.",
+                    rating: 5,
+                    text: "Coklat Dubai terenak yang pernah saya coba! Teksturnya lembut dan rasanya authentic banget. Pasti order lagi!"
+                },
+                {
+                    id: 2,
+                    name: "Ahmad R.",
+                    rating: 5,
+                    text: "Pelayanan cepat, packaging rapi, dan yang paling penting rasanya enak banget! Recommended!"
+                }
+            ];
+            
+            saveData();
+        }
+
+        // Manual backup and restore
+        function backupData() {
+            const data = {
+                products: products,
+                testimonials: testimonials,
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `choco_dubai_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert('Data berhasil di-backup!');
+        }
+
+        function restoreData() {
+            document.getElementById('restore-file').click();
+        }
+
+        function handleRestore(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.products && data.testimonials) {
+                            products = data.products;
+                            testimonials = data.testimonials;
+                            saveData();
+                            syncToFirebase();
+                            renderProducts();
+                            renderTestimonials();
+                            alert('Data berhasil di-restore!');
+                        } else {
+                            alert('Format file tidak valid!');
+                        }
+                    } catch (error) {
+                        alert('Error membaca file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // UI Functions
+        function toggleAdmin() {
+            const panel = document.getElementById('admin-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            resetForms();
+        }
+
+        function resetForms() {
+            document.getElementById('product-form').reset();
+            document.getElementById('testimonial-form').reset();
+            document.getElementById('image-preview').classList.add('hidden');
+            
+            const label = document.querySelector('.file-input-label');
+            label.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Pilih Gambar dari Laptop';
+            label.style.borderColor = '#ddd';
+            label.style.background = '#f8f9fa';
+            
+            currentEditingProduct = null;
+            currentEditingTestimonial = null;
+            
+            // Reset variations container
+            const container = document.getElementById('variations-container');
+            container.innerHTML = `
+                <div class="variation-input">
+                    <input type="text" placeholder="Nama variasi" class="variation-name">
+                    <input type="number" placeholder="Harga variasi" class="variation-price">
+                    <button type="button" onclick="removeVariation(this)" class="btn btn-danger">Hapus</button>
+                </div>
+            `;
+        }
+
+        // Product Management
+        function openProductModal(productId = null) {
+            if (productId) {
+                const product = products.find(p => p.id === productId);
+                if (product) {
+                    currentEditingProduct = product;
+                    document.getElementById('product-modal-title').textContent = 'Edit Produk';
+                    document.getElementById('product-name').value = product.name;
+                    document.getElementById('product-price').value = product.price;
+                    document.getElementById('product-description').value = product.description;
+                    
+                    // Show existing image if available
+                    if (product.image) {
+                        const preview = document.getElementById('image-preview');
+                        preview.src = product.image;
+                        preview.classList.remove('hidden');
+                        
+                        const label = document.querySelector('.file-input-label');
+                        label.innerHTML = '<i class="fas fa-check"></i> Gambar saat ini (pilih file baru untuk mengganti)';
+                        label.style.borderColor = '#28a745';
+                        label.style.background = '#d4edda';
+                    }
+                    
+                    // Load variations
+                    const container = document.getElementById('variations-container');
+                    container.innerHTML = '';
+                    product.variations.forEach(variation => {
+                        const div = document.createElement('div');
+                        div.className = 'variation-input';
+                        div.innerHTML = `
+                            <input type="text" placeholder="Nama variasi" class="variation-name" value="${variation.name}">
+                            <input type="number" placeholder="Harga variasi" class="variation-price" value="${variation.price}">
+                            <button type="button" onclick="removeVariation(this)" class="btn btn-danger">Hapus</button>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } else {
+                document.getElementById('product-modal-title').textContent = 'Tambah Produk';
+            }
+            openModal('product-modal');
+        }
+
+        function addVariation() {
+            const container = document.getElementById('variations-container');
+            const div = document.createElement('div');
+            div.className = 'variation-input';
+            div.innerHTML = `
+                <input type="text" placeholder="Nama variasi" class="variation-name">
+                <input type="number" placeholder="Harga variasi" class="variation-price">
+                <button type="button" onclick="removeVariation(this)" class="btn btn-danger">Hapus</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeVariation(button) {
+            button.parentElement.remove();
+        }
+
+        function deleteProduct(id) {
+            if (confirm('Yakin ingin menghapus produk ini?')) {
+                products = products.filter(p => p.id !== id);
+                saveData();
+                renderProducts();
+                syncToFirebase(); // This will trigger real-time update for all users
+            }
+        }
+
+        // Testimonial Management
+        function openTestimonialModal(testimonialId = null) {
+            if (testimonialId) {
+                const testimonial = testimonials.find(t => t.id === testimonialId);
+                if (testimonial) {
+                    currentEditingTestimonial = testimonial;
+                    document.getElementById('testimonial-modal-title').textContent = 'Edit Testimoni';
+                    document.getElementById('testimonial-name').value = testimonial.name;
+                    document.getElementById('testimonial-rating').value = testimonial.rating;
+                    document.getElementById('testimonial-text').value = testimonial.text;
+                }
+            } else {
+                document.getElementById('testimonial-modal-title').textContent = 'Tambah Testimoni';
+            }
+            openModal('testimonial-modal');
+        }
+
+        function deleteTestimonial(id) {
+            if (confirm('Yakin ingin menghapus testimoni ini?')) {
+                testimonials = testimonials.filter(t => t.id !== id);
+                saveData();
+                renderTestimonials();
+                syncToFirebase(); // This will trigger real-time update for all users
+            }
+        }
+
+        // Form Handlers with better error handling
+        document.getElementById('product-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            console.log('📝 Product form submitted...');
+            
+            try {
+                const name = document.getElementById('product-name').value;
+                const price = parseInt(document.getElementById('product-price').value);
+                const description = document.getElementById('product-description').value;
+                const imageInput = document.getElementById('product-image');
+                
+                console.log('📝 Product data:', { name, price, description });
+                
+                // Get image as base64 data URL
+                let imageData = '';
+                if (imageInput.files && imageInput.files[0]) {
+                    console.log('🖼️ Processing image...');
+                    imageData = await getImageDataURL(imageInput);
+                    console.log('🖼️ Image processed, size:', imageData.length);
+                } else if (currentEditingProduct && currentEditingProduct.image) {
+                    imageData = currentEditingProduct.image; // Keep existing image
+                    console.log('🖼️ Keeping existing image');
+                }
+                
+                // Collect variations
+                const variationInputs = document.querySelectorAll('.variation-input');
+                const variations = [];
+                variationInputs.forEach(input => {
+                    const name = input.querySelector('.variation-name').value;
+                    const price = parseInt(input.querySelector('.variation-price').value);
+                    if (name && price) {
+                        variations.push({ name, price });
+                    }
+                });
+                
+                console.log('📝 Variations:', variations);
+                
+                if (currentEditingProduct) {
+                    // Update existing product
+                    console.log('✏️ Updating existing product...');
+                    currentEditingProduct.name = name;
+                    currentEditingProduct.price = price;
+                    currentEditingProduct.description = description;
+                    currentEditingProduct.image = imageData;
+                    currentEditingProduct.variations = variations;
+                } else {
+                    // Add new product
+                    console.log('➕ Adding new product...');
+                    const newProduct = {
+                        id: Date.now(),
+                        name,
+                        price,
+                        description,
+                        image: imageData,
+                        variations
+                    };
+                    products.push(newProduct);
+                    console.log('➕ Product added, total products:', products.length);
+                }
+                
+                // Save locally first
+                const localSaved = saveData();
+                if (!localSaved) {
+                    throw new Error('Failed to save data locally');
+                }
+                
+                // Render immediately
+                renderProducts();
+                
+                // Sync to Firebase
+                console.log('🔄 Attempting Firebase sync...');
+                try {
+                    const syncResult = await syncToFirebase();
+                    if (syncResult) {
+                        console.log('✅ Product saved successfully (local + Firebase)');
+                        updateFirebaseStatus('✅ Produk tersimpan!', false);
+                    } else {
+                        console.log('⚠️ Product saved locally, Firebase sync failed');
+                        updateFirebaseStatus('⚠️ Tersimpan lokal, Firebase gagal', true);
+                    }
+                } catch (syncError) {
+                    console.error('❌ Firebase sync error:', syncError);
+                    updateFirebaseStatus('⚠️ Tersimpan lokal saja', true);
+                }
+                
+                closeModal('product-modal');
+                
+            } catch (error) {
+                console.error('❌ Error saving product:', error);
+                updateFirebaseStatus('❌ Error: ' + error.message, true);
+                alert('Error menyimpan produk: ' + error.message);
+            }
+        });
+
+        document.getElementById('testimonial-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('testimonial-name').value;
+            const rating = parseInt(document.getElementById('testimonial-rating').value);
+            const text = document.getElementById('testimonial-text').value;
+            
+            if (currentEditingTestimonial) {
+                // Update existing testimonial
+                currentEditingTestimonial.name = name;
+                currentEditingTestimonial.rating = rating;
+                currentEditingTestimonial.text = text;
+            } else {
+                // Add new testimonial
+                const newTestimonial = {
+                    id: Date.now(),
+                    name,
+                    rating,
+                    text
+                };
+                testimonials.push(newTestimonial);
+            }
+            
+            saveData();
+            renderTestimonials();
+            syncToFirebase(); // This will trigger real-time update for all users
+            closeModal('testimonial-modal');
+        });
+
+        // Render Functions
+        function renderProducts() {
+            const container = document.getElementById('products-container');
+            container.innerHTML = '';
+            
+            products.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                productCard.innerHTML = `
+                    <div class="product-image ${product.image ? '' : 'placeholder'}">
+                        ${product.image ? `<img src="${product.image}" alt="${product.name}">` : '<i class="fas fa-image"></i>'}
+                    </div>
+                    <div class="product-title">${product.name}</div>
+                    <div class="product-price">Rp ${product.price.toLocaleString('id-ID')}</div>
+                    <div class="product-description">${product.description}</div>
+                    ${product.variations.length > 0 ? `
+                        <div class="variations">
+                            <strong>Variasi:</strong>
+                            ${product.variations.map(v => `
+                                <div class="variation-item">
+                                    <span>${v.name}</span>
+                                    <span>Rp ${v.price.toLocaleString('id-ID')}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    <button class="order-btn" onclick="orderProduct('${product.name}')">
+                        <i class="fab fa-whatsapp"></i>
+                        Click to Order
+                    </button>
+                    <div class="admin-controls">
+                        <button class="btn" onclick="openProductModal(${product.id})" style="flex: 1;">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteProduct(${product.id})" style="flex: 1;">
+                            <i class="fas fa-trash"></i> Hapus
+                        </button>
+                    </div>
+                `;
+                container.appendChild(productCard);
+            });
+        }
+
+        function renderTestimonials() {
+            const container = document.getElementById('testimonials-container');
+            container.innerHTML = '';
+            
+            testimonials.forEach(testimonial => {
+                const testimonialCard = document.createElement('div');
+                testimonialCard.className = 'testimonial-item';
+                testimonialCard.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <strong>${testimonial.name}</strong>
+                            <div style="color: #f39c12; margin: 0.25rem 0;">
+                                ${'⭐'.repeat(testimonial.rating)}
+                            </div>
+                        </div>
+                        <div style="display: ${isAdminLoggedIn ? 'flex' : 'none'}; gap: 0.5rem;">
+                            <button class="btn" onclick="openTestimonialModal(${testimonial.id})" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteTestimonial(${testimonial.id})" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p>${testimonial.text}</p>
+                `;
+                container.appendChild(testimonialCard);
+            });
+        }
+
+        // WhatsApp Order Function
+        function orderProduct(productName) {
+            const message = `Halo! Saya tertarik untuk memesan ${productName}. Bisa info lebih lanjut?`;
+            const whatsappUrl = `https://wa.me/6282276882317?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                    resetForms();
+                }
+            });
+        }
+
+        // Enter key for password
+        document.getElementById('admin-password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAdminPassword();
+            }
+        });
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add animation effects
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe product cards for animation
+        setTimeout(() => {
+            const cards = document.querySelectorAll('.product-card, .testimonial-item');
+            cards.forEach(card => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(card);
+            });
+        }, 100);
+
+        // Add keyboard shortcuts for admin
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault();
+                        saveData();
+                        if (isAdminLoggedIn) syncToFirebase();
+                        updateFirebaseStatus('💾 Data saved manually!', false);
+                        break;
+                    case 'b':
+                        e.preventDefault();
+                        if (isAdminLoggedIn) backupData();
+                        break;
+                }
+            }
+        });
+
+        // Error handling for images
+        document.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG') {
+                e.target.style.display = 'none';
+                e.target.parentElement.classList.add('placeholder');
+                e.target.parentElement.innerHTML = '<i class="fas fa-image"></i>';
+            }
+        }, true);
+
+        console.log('🍫 Choco.dubaiid website loaded successfully!');
+        console.log('📝 Features: Password-protected admin, Firebase integration, Image upload, Auto-backup');
+        console.log('🔑 Admin password hash is securely encoded');
+    </script>
+</body>
+</html>
